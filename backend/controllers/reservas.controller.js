@@ -25,9 +25,18 @@ export const getAllReservas = async (req, res) => {
  * @route   GET /api/reservas/:id
  */
 export const getReservaById = async (req, res) => {
-  const { id } = req.params;
-  const reserva = reservas.find(r => r.id === parseInt(id));
-  res.json(reserva);
+  try {
+    const { id } = req.params;
+    const reserva = reservas.find(r => r.id === parseInt(id));
+    
+    if (!reserva) {
+      return res.status(404).json({ error: 'Reserva no encontrada' });
+    }
+    
+    res.json(reserva);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 /**

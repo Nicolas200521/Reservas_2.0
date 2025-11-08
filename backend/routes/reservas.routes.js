@@ -1,6 +1,6 @@
 import express from 'express';
 import { 
-  getReservas, 
+  getAllReservas, 
   createReserva, 
   updateReserva, 
   deleteReserva,
@@ -14,7 +14,7 @@ const router = express.Router();
  * @desc    Obtener todas las reservas
  * @access  Private
  */
-router.get('/', getReservas);
+router.get('/', getAllReservas);
 
 /**
  * @route   GET /api/reservas/:id
