@@ -1,5 +1,5 @@
 import express from 'express';
-import { login, register, getProfile } from '../controllers/auth.controller.js';
+import { login, register, getProfile, forgotPassword } from '../controllers/auth.controller.js';
 
 const router = express.Router();
 
@@ -23,6 +23,13 @@ router.post('/register', register);
  * @access  Private
  */
 router.get('/profile', getProfile);
+
+/**
+ * @route   POST /api/auth/forgot-password
+ * @desc    Solicitar recuperación de contraseña
+ * @access  Public
+ */
+router.post('/forgot-password', forgotPassword);
 
 export default router;
 

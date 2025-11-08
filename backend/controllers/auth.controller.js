@@ -11,6 +11,27 @@ let users = [
     password: 'admin123', // En producción: hash con bcrypt
     name: 'Administrador',
     role: 'admin'
+  },
+  {
+    id: 2,
+    email: 'usuario@reservas.com',
+    password: 'usuario123',
+    name: 'Usuario de Prueba',
+    role: 'user'
+  },
+  {
+    id: 3,
+    email: 'juan@reservas.com',
+    password: 'juan123',
+    name: 'Juan Pérez',
+    role: 'user'
+  },
+  {
+    id: 4,
+    email: 'maria@reservas.com',
+    password: 'maria123',
+    name: 'María García',
+    role: 'user'
   }
 ];
 
@@ -113,6 +134,44 @@ export const getProfile = async (req, res) => {
     const { password: _, ...userWithoutPassword } = user;
 
     res.json({ user: userWithoutPassword });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * @desc    Solicitar recuperación de contraseña
+ * @route   POST /api/auth/forgot-password
+ */
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validación
+    if (!email) {
+      return res.status(400).json({ 
+        error: 'El email es requerido' 
+      });
+    }
+
+    // Verificar si el usuario existe
+    const user = users.find(u => u.email === email);
+
+    if (!user) {
+      // Por seguridad, no revelamos si el email existe o no
+      return res.json({
+        message: 'Si el email existe, se enviará un enlace de recuperación'
+      });
+    }
+
+    // En producción: enviar email con token de recuperación
+    // Por ahora, solo retornamos un mensaje educativo
+    res.json({
+      message: 'Si el email existe, se enviará un enlace de recuperación',
+      // En producción: generar token y enviar email
+      // token: generateResetToken(),
+      note: 'Este es un ejemplo educativo. En producción se enviaría un email.'
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

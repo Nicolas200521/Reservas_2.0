@@ -2,17 +2,87 @@ import { useState } from 'react'
 import './App.css'
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaEnvelope, FaLock } from "react-icons/fa";
+import Dashboard from './components/Dashboard';
+import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
 
 function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [currentView, setCurrentView] = useState('login') // 'login', 'register', 'forgot-password'
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Login:', { email, password })
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al iniciar sesión')
+      }
+
+      // Login exitoso
+      setUser(data.user)
+      setIsAuthenticated(true)
+      // Limpiar formulario
+      setEmail('')
+      setPassword('')
+    } catch (err) {
+      setError(err.message || 'Error al iniciar sesión. Verifica tus credenciales.')
+    } finally {
+      setLoading(false)
+    }
   }
 
+  const handleLogout = () => {
+    setIsAuthenticated(false)
+    setUser(null)
+    setError('')
+  }
+
+  // Si está autenticado, mostrar el Dashboard
+  if (isAuthenticated && user) {
+    return <Dashboard user={user} onLogout={handleLogout} />
+  }
+
+  // Mostrar pantalla de registro
+  if (currentView === 'register') {
+    return (
+      <Register 
+        onBackToLogin={() => setCurrentView('login')}
+        onRegisterSuccess={(userData) => {
+          setUser(userData);
+          setIsAuthenticated(true);
+        }}
+      />
+    );
+  }
+
+  // Mostrar pantalla de recuperación de contraseña
+  if (currentView === 'forgot-password') {
+    return (
+      <ForgotPassword 
+        onBackToLogin={() => setCurrentView('login')}
+      />
+    );
+  }
+
+  // Mostrar pantalla de login (por defecto)
   return (
     <div className="login-container">
       <div className="login-card">
@@ -25,6 +95,12 @@ function App() {
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
+          
           <div className="form-group">
             <label htmlFor="email">
               <span className="icon"><FaEnvelope /></span>
@@ -37,6 +113,7 @@ function App() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Correo Electrónico"
               required
+              disabled={loading}
             />
           </div>
 
@@ -69,19 +146,29 @@ function App() {
               <input type="checkbox" />
               <span>Recordarme</span>
             </label>
-            <a href="#" className="forgot-password">¿Olvidaste tu contraseña?</a>
+            <button 
+              type="button"
+              onClick={() => setCurrentView('forgot-password')}
+              className="forgot-password-link"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
           </div>
 
-          <button type="submit" className="login-button">
-            Iniciar Sesión
-            <span className="button-icon">→</span>
+          <button type="submit" className="login-button" disabled={loading}>
+            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            {!loading && <span className="button-icon">→</span>}
           </button>
 
           <div className="divider">
             <span>o</span>
           </div>
 
-          <button type="button" className="register-button">
+          <button 
+            type="button" 
+            className="register-button"
+            onClick={() => setCurrentView('register')}
+          >
             ¿No tienes cuenta? <strong>Regístrate</strong>
           </button>
         </form>
