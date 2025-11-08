@@ -15,13 +15,6 @@ function App() {
 
   return (
     <div className="login-container">
-      <div className="login-background">
-        <div className="field-lines"></div>
-        <div className="field-circle"></div>
-        <div className="field-penalty-left"></div>
-        <div className="field-penalty-right"></div>
-      </div>
-      
       <div className="login-card">
         <div className="login-header">
           <div className="ball-icon">
