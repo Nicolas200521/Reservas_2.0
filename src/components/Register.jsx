@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaEnvelope, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
 import './Auth.css';
+import { API_ENDPOINTS } from '../config/api';
 
 function Register({ onBackToLogin, onRegisterSuccess }) {
   const [formData, setFormData] = useState({
@@ -51,7 +52,7 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch(API_ENDPOINTS.AUTH.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

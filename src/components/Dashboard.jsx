@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaSignOutAlt, FaCalendarAlt, FaUser } from "react-icons/fa";
 import './Dashboard.css';
+import { API_ENDPOINTS } from '../config/api';
 
 function Dashboard({ user, onLogout }) {
   const [reservas, setReservas] = useState([]);
@@ -14,7 +15,7 @@ function Dashboard({ user, onLogout }) {
 
   const fetchReservas = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/reservas');
+      const response = await fetch(API_ENDPOINTS.RESERVAS.BASE);
       const data = await response.json();
       setReservas(Array.isArray(data) ? data : data.reservas || []);
     } catch (error) {
