@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaEnvelope, FaLock } from "react-icons/fa";
@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import { API_ENDPOINTS } from './config/api';
+import { saveToken, saveUser, getToken, getUser, removeToken, isTokenExpired } from './services/authService';
 
 function App() {
   const [email, setEmail] = useState('')
@@ -16,6 +17,22 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentView, setCurrentView] = useState('login') // 'login', 'register', 'forgot-password'
+
+  // Verificar si hay un token guardado al cargar la app
+  useEffect(() => {
+    const token = getToken();
+    const savedUser = getUser();
+    
+    if (token && savedUser) {
+      // Verificar si el token está expirado
+      if (isTokenExpired(token)) {
+        removeToken();
+      } else {
+        setUser(savedUser);
+        setIsAuthenticated(true);
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -37,8 +54,14 @@ function App() {
         throw new Error(data.error || 'Error al iniciar sesión')
       }
 
-      // Login exitoso
-      setUser(data.user)
+      // Login exitoso - Guardar token y usuario
+      if (data.token) {
+        saveToken(data.token);
+      }
+      if (data.user) {
+        saveUser(data.user);
+        setUser(data.user);
+      }
       setIsAuthenticated(true)
       // Limpiar formulario
       setEmail('')
@@ -51,6 +74,7 @@ function App() {
   }
 
   const handleLogout = () => {
+    removeToken();
     setIsAuthenticated(false)
     setUser(null)
     setError('')

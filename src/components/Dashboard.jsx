@@ -3,6 +3,7 @@ import { PiSoccerBallFill } from "react-icons/pi";
 import { FaSignOutAlt, FaCalendarAlt, FaUser } from "react-icons/fa";
 import './Dashboard.css';
 import { API_ENDPOINTS } from '../config/api';
+import { apiGet } from '../utils/apiClient';
 
 function Dashboard({ user, onLogout }) {
   const [reservas, setReservas] = useState([]);
@@ -15,12 +16,12 @@ function Dashboard({ user, onLogout }) {
 
   const fetchReservas = async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.RESERVAS.BASE);
-      const data = await response.json();
+      const data = await apiGet(API_ENDPOINTS.RESERVAS.BASE);
       setReservas(Array.isArray(data) ? data : data.reservas || []);
     } catch (error) {
       console.error('Error al cargar reservas:', error);
       setReservas([]);
+      // Si el error es de autenticación, el apiClient ya limpió el token
     } finally {
       setLoading(false);
     }

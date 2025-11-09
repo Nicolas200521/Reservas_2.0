@@ -3,6 +3,7 @@ import { PiSoccerBallFill } from "react-icons/pi";
 import { FaEnvelope, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
 import './Auth.css';
 import { API_ENDPOINTS } from '../config/api';
+import { saveToken, saveUser } from '../services/authService';
 
 function Register({ onBackToLogin, onRegisterSuccess }) {
   const [formData, setFormData] = useState({
@@ -70,11 +71,18 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
         throw new Error(data.error || 'Error al registrar usuario');
       }
 
-      setSuccess('¡Registro exitoso! Redirigiendo al login...');
-  
+      setSuccess('¡Registro exitoso! Redirigiendo...');
+      
+      // Guardar token y usuario si vienen en la respuesta
+      if (data.token) {
+        saveToken(data.token);
+      }
+      if (data.user) {
+        saveUser(data.user);
+      }
       
       setTimeout(() => {
-        if (onRegisterSuccess) {
+        if (onRegisterSuccess && data.user) {
           onRegisterSuccess(data.user);
         } else {
           onBackToLogin();
