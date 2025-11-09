@@ -5,6 +5,7 @@ import { FaEnvelope, FaLock } from "react-icons/fa";
 import Dashboard from './components/Dashboard';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
+import { API_ENDPOINTS } from './config/api';
 
 function App() {
   const [email, setEmail] = useState('')
@@ -22,7 +23,7 @@ function App() {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

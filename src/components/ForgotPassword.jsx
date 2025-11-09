@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaEnvelope, FaArrowLeft, FaCheckCircle } from "react-icons/fa";
 import './Auth.css';
+import { API_ENDPOINTS } from '../config/api';
 
 function ForgotPassword({ onBackToLogin }) {
   const [email, setEmail] = useState('');
@@ -22,7 +23,7 @@ function ForgotPassword({ onBackToLogin }) {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/auth/forgot-password', {
+      const response = await fetch(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
