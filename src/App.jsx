@@ -128,7 +128,7 @@ function App() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Contraseña"
                 required
               />
               <button
