@@ -55,6 +55,27 @@
   color: #6c757d;
 }
 
+.admin-icon {
+  color: #ffc107;
+  font-size: 1.5rem;
+}
+
+.role-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  text-transform: uppercase;
+}
+
+.role-badge.admin {
+  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+  color: #000;
+  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+}
+
 .user-details {
   display: flex;
   flex-direction: column;
@@ -120,6 +141,60 @@
 .welcome-section p {
   color: #6c757d;
   font-size: 1.1rem;
+}
+
+/* Tabs de navegación para Admin */
+.admin-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tab-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  color: #6c757d;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab-button:hover {
+  border-color: #28a745;
+  color: #28a745;
+  background: rgba(40, 167, 69, 0.05);
+}
+
+.tab-button.active {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border-color: #28a745;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.tab-button svg {
+  font-size: 1.1rem;
+}
+
+/* Tabs de navegación para Usuario */
+.user-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .stats-section {
@@ -343,6 +418,37 @@
   background: #c82333;
 }
 
+/* Sección de Usuarios (Admin) */
+.usuarios-section {
+  background: white;
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.admin-placeholder {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.placeholder-icon {
+  font-size: 5rem;
+  color: #dee2e6;
+  margin-bottom: 1.5rem;
+}
+
+.admin-placeholder p {
+  color: #6c757d;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.placeholder-note {
+  color: #adb5bd;
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .header-content {
@@ -371,6 +477,15 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .admin-tabs {
+    flex-direction: column;
+  }
+
+  .tab-button {
+    width: 100%;
+    justify-content: center;
   }
 }
 
