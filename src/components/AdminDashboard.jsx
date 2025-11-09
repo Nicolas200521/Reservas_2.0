@@ -60,8 +60,8 @@ function AdminDashboard({ user, onLogout }) {
       <main className="dashboard-main">
         <div className="dashboard-content">
           <section className="welcome-section">
-            <h2>¡Bienvenido, Administrador {user?.name}!</h2>
-            <p>Gestiona todas las reservas y usuarios del sistema</p>
+            <h2>¡Bienvenido,{user?.name}!</h2>
+            <p>Gestiona todas las reservas</p>
           </section>
 
           {/* Tabs de navegación para Admin */}

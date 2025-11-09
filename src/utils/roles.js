@@ -64,8 +64,7 @@ export const canViewAllReservas = (user) => {
 };
 
 /**
- * Verifica si el usuario puede editar cualquier reserva
- * @param {object} user - Objeto usuario
+ * @param {object} user 
  * @returns {boolean}
  */
 export const canEditAnyReserva = (user) => {
