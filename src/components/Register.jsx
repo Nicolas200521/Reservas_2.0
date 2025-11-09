@@ -70,8 +70,8 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
       }
 
       setSuccess('¡Registro exitoso! Redirigiendo al login...');
+  
       
-      // Esperar un momento y luego redirigir al login
       setTimeout(() => {
         if (onRegisterSuccess) {
           onRegisterSuccess(data.user);
