@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
-import { FaEnvelope, FaLock, FaUser, FaArrowLeft } from "react-icons/fa";
+import { FaEnvelope, FaLock, FaUser, FaArrowLeft, FaPhone } from "react-icons/fa";
 import './Auth.css';
 import { API_ENDPOINTS } from '../config/api';
 import { saveToken, saveUser } from '../services/authService';
@@ -9,6 +9,7 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    telefono: '',
     password: '',
     confirmPassword: ''
   });
@@ -34,8 +35,17 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
     setSuccess('');
 
     // Validaciones
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+    if (!formData.name || !formData.email || !formData.telefono || !formData.password || !formData.confirmPassword) {
       setError('Todos los campos son requeridos');
+      setLoading(false);
+      return;
+    }
+
+    // Validar formato de teléfono (solo números, mínimo 7 dígitos)
+    const telefonoRegex = /^[0-9]{7,15}$/;
+    const telefonoLimpio = formData.telefono.replace(/\s|-/g, '');
+    if (!telefonoRegex.test(telefonoLimpio)) {
+      setError('El teléfono debe contener entre 7 y 15 dígitos');
       setLoading(false);
       return;
     }
@@ -61,6 +71,7 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
+          telefono: formData.telefono.replace(/\s|-/g, ''),
           password: formData.password
         }),
       });
@@ -154,6 +165,23 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
               value={formData.email}
               onChange={handleChange}
               placeholder="tu@correo.com"
+              required
+              disabled={loading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="telefono">
+              <span className="icon"><FaPhone /></span>
+              Teléfono
+            </label>
+            <input
+              type="tel"
+              id="telefono"
+              name="telefono"
+              value={formData.telefono}
+              onChange={handleChange}
+              placeholder="1234567890"
               required
               disabled={loading}
             />
