@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
-import { FaCheck, FaTimes, FaUser, FaCalendarAlt, FaClock } from "react-icons/fa";
-import { obtenerReservas, actualizarReserva } from '../services/reservasService';
+import { FaCheck, FaTimes, FaUser, FaCalendarAlt, FaClock, FaTimesCircle } from "react-icons/fa";
+import { obtenerReservas, actualizarEstadoReserva } from '../services/reservasService';
 import { formatearFecha, formatearHora, calcularDuracion, obtenerNombreCancha, obtenerNombreUsuario } from '../utils/reservaHelpers';
+import { useNotification } from '../hooks/useNotification';
+import Notification from './Notification';
 import './ReservasPendientes.css';
 
 function ReservasPendientes({ onReservaActualizada }) {
   const [reservasPendientes, setReservasPendientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  const [showRechazarModal, setShowRechazarModal] = useState(false);
+  const [reservaARechazar, setReservaARechazar] = useState(null);
+  const [motivoRechazo, setMotivoRechazo] = useState('');
+  const { notification, showNotification, hideNotification } = useNotification();
 
   useEffect(() => {
     fetchReservasPendientes();
@@ -33,72 +39,86 @@ function ReservasPendientes({ onReservaActualizada }) {
   };
 
   const handleAceptar = async (reservaId) => {
+    if (!reservaId) {
+      showNotification('Error: ID de reserva no válido', 'error');
+      return;
+    }
+
     setProcessingId(reservaId);
     try {
-      // El backend espera que actualicemos el id_estado_reserva a 2 (confirmada)
-      // Pero según la documentación, solo podemos actualizar fecha, hora_inicio y hora_fin
-      // Necesitamos verificar si el backend acepta actualizar el estado directamente
-      // Por ahora, intentamos actualizar con id_estado_reserva
-      await actualizarReserva(reservaId, {
-        id_estado_reserva: 2
-      });
+      // Validar que el ID sea un número
+      const id = typeof reservaId === 'number' ? reservaId : parseInt(reservaId);
+      if (isNaN(id)) {
+        throw new Error('ID de reserva inválido');
+      }
+
+      // Actualizar el estado de la reserva a "confirmada" (id_estado_reserva: 2)
+      console.log('Aceptando reserva:', { reservaId: id, nuevoEstado: 2 });
       
-      // Actualizar la lista
-      setReservasPendientes(prev => 
-        prev.filter(r => r.id_reserva !== reservaId)
-      );
+      await actualizarEstadoReserva(id, 2);
       
-      // Mostrar mensaje de éxito
-      alert('Reserva aceptada exitosamente. El estado ha cambiado a "confirmada".');
+      // Mostrar notificación de éxito
+      showNotification('Reserva aceptada exitosamente. El estado ha cambiado a "confirmada".', 'success');
       
       // Notificar al componente padre para actualizar estadísticas
       if (onReservaActualizada) {
         onReservaActualizada();
       }
       
-      // Recargar la lista
+      // Recargar la lista de reservas pendientes (la reserva aceptada ya no aparecerá)
       fetchReservasPendientes();
     } catch (error) {
       console.error('Error al aceptar reserva:', error);
-      alert(error.message || 'Error al aceptar la reserva. Intenta nuevamente.');
+      const mensajeError = error.message || 'Error al aceptar la reserva. Intenta nuevamente.';
+      showNotification(mensajeError, 'error');
     } finally {
       setProcessingId(null);
     }
   };
 
-  const handleRechazar = async (reservaId) => {
-    if (!window.confirm('¿Estás seguro de que deseas rechazar esta reserva?')) {
-      return;
-    }
+  const handleRechazarClick = (reserva) => {
+    setReservaARechazar(reserva);
+    setMotivoRechazo('');
+    setShowRechazarModal(true);
+  };
+
+  const handleConfirmarRechazo = async () => {
+    if (!reservaARechazar) return;
     
+    const reservaId = reservaARechazar.id_reserva;
     setProcessingId(reservaId);
+    setShowRechazarModal(false);
+    
     try {
-      // El backend espera que actualicemos el id_estado_reserva a 3 (cancelada/rechazada)
-      await actualizarReserva(reservaId, {
-        id_estado_reserva: 3
-      });
+      // Actualizar el estado de la reserva a "rechazada" (id_estado_reserva: 4)
+      // Si no se proporciona motivo, se envía un valor por defecto
+      const motivo = motivoRechazo.trim() || 'Reserva rechazada por el administrador';
+      await actualizarEstadoReserva(reservaId, 4, motivo);
       
-      // Actualizar la lista
-      setReservasPendientes(prev => 
-        prev.filter(r => r.id_reserva !== reservaId)
-      );
-      
-      // Mostrar mensaje de éxito
-      alert('Reserva rechazada exitosamente.');
+      // Mostrar notificación de éxito
+      showNotification('Reserva rechazada exitosamente.', 'success');
       
       // Notificar al componente padre para actualizar estadísticas
       if (onReservaActualizada) {
         onReservaActualizada();
       }
       
-      // Recargar la lista
+      // Recargar la lista de reservas pendientes (la reserva rechazada ya no aparecerá)
       fetchReservasPendientes();
     } catch (error) {
       console.error('Error al rechazar reserva:', error);
-      alert(error.message || 'Error al rechazar la reserva. Intenta nuevamente.');
+      showNotification(error.message || 'Error al rechazar la reserva. Intenta nuevamente.', 'error');
     } finally {
       setProcessingId(null);
+      setReservaARechazar(null);
+      setMotivoRechazo('');
     }
+  };
+
+  const handleCancelarRechazo = () => {
+    setShowRechazarModal(false);
+    setReservaARechazar(null);
+    setMotivoRechazo('');
   };
 
   if (loading) {
@@ -106,7 +126,16 @@ function ReservasPendientes({ onReservaActualizada }) {
   }
 
   return (
-    <section className="reservas-pendientes-section">
+    <>
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={notification.duration}
+          onClose={hideNotification}
+        />
+      )}
+      <section className="reservas-pendientes-section">
       <div className="section-header">
         <h2>Reservas Pendientes</h2>
         <span className="badge-count">{reservasPendientes.length}</span>
@@ -194,7 +223,7 @@ function ReservasPendientes({ onReservaActualizada }) {
                   </button>
                   <button
                     className="action-button rechazar"
-                    onClick={() => handleRechazar(reserva.id_reserva)}
+                    onClick={() => handleRechazarClick(reserva)}
                     disabled={processingId === reserva.id_reserva}
                   >
                     <FaTimes />
@@ -206,7 +235,116 @@ function ReservasPendientes({ onReservaActualizada }) {
           })}
         </div>
       )}
+
+      {/* Modal de Confirmación de Rechazo */}
+      {showRechazarModal && reservaARechazar && (
+        <div className="modal-overlay" onClick={handleCancelarRechazo}>
+          <div className="modal-content-rechazar" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header-rechazar">
+              <h2>Confirmar Rechazo de Reserva</h2>
+              <button className="modal-close" onClick={handleCancelarRechazo}>×</button>
+            </div>
+
+            <div className="modal-body-rechazar">
+              <div className="reserva-detail-card">
+                <div className="reserva-detail-header">
+                  <PiSoccerBallFill className="detail-icon-large" />
+                  <h3>{obtenerNombreCancha(reservaARechazar)}</h3>
+                  <span className="estado-badge pendiente">Pendiente</span>
+                </div>
+
+                <div className="reserva-detail-info">
+                  <div className="detail-item-full">
+                    <FaUser className="detail-icon" />
+                    <div className="detail-content-full">
+                      <span className="detail-label">Solicitado por:</span>
+                      <span className="detail-value">{obtenerNombreUsuario(reservaARechazar)}</span>
+                    </div>
+                  </div>
+
+                  <div className="detail-item-full">
+                    <FaCalendarAlt className="detail-icon" />
+                    <div className="detail-content-full">
+                      <span className="detail-label">Fecha:</span>
+                      <span className="detail-value">{formatearFecha(reservaARechazar.fecha)}</span>
+                    </div>
+                  </div>
+
+                  <div className="detail-item-full">
+                    <FaClock className="detail-icon" />
+                    <div className="detail-content-full">
+                      <span className="detail-label">Hora:</span>
+                      <span className="detail-value">
+                        {formatearHora(reservaARechazar.hora_inicio)} - {formatearHora(reservaARechazar.hora_fin)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {calcularDuracion(reservaARechazar.hora_inicio, reservaARechazar.hora_fin) > 0 && (
+                    <div className="detail-item-full">
+                      <PiSoccerBallFill className="detail-icon" />
+                      <div className="detail-content-full">
+                        <span className="detail-label">Duración:</span>
+                        <span className="detail-value">
+                          {calcularDuracion(reservaARechazar.hora_inicio, reservaARechazar.hora_fin)} minutos
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {reservaARechazar.codigo_acceso && (
+                    <div className="detail-item-full">
+                      <div className="detail-content-full">
+                        <span className="detail-label">Código de acceso:</span>
+                        <span className="detail-value">{reservaARechazar.codigo_acceso}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="modal-warning">
+                  <FaTimesCircle className="warning-icon" />
+                  <p>¿Estás seguro de que deseas rechazar esta reserva? Esta acción cambiará el estado a "rechazada".</p>
+                </div>
+
+                <div className="rechazo-field-container">
+                  <label htmlFor="motivo-rechazo" className="rechazo-label">
+                    Motivo de rechazo (opcional)
+                  </label>
+                  <textarea
+                    id="motivo-rechazo"
+                    className="rechazo-textarea"
+                    placeholder="Ingresa el motivo por el cual rechazas esta reserva (opcional)..."
+                    value={motivoRechazo}
+                    onChange={(e) => setMotivoRechazo(e.target.value)}
+                    rows={4}
+                    disabled={processingId === reservaARechazar.id_reserva}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions-rechazar">
+              <button
+                className="modal-button cancel"
+                onClick={handleCancelarRechazo}
+                disabled={processingId === reservaARechazar.id_reserva}
+              >
+                Cancelar
+              </button>
+              <button
+                className="modal-button confirm-rechazar"
+                onClick={handleConfirmarRechazo}
+                disabled={processingId === reservaARechazar.id_reserva}
+              >
+                {processingId === reservaARechazar.id_reserva ? 'Rechazando...' : 'Confirmar Rechazo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
+    </>
   );
 }
 

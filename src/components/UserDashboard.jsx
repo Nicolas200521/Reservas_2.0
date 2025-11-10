@@ -2,14 +2,22 @@ import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaSignOutAlt, FaCalendarAlt, FaUser, FaFutbol } from "react-icons/fa";
 import './Dashboard.css';
-import { obtenerMisReservas, eliminarReserva } from '../services/reservasService';
+import { obtenerReservas, actualizarEstadoReserva } from '../services/reservasService';
+import { getUser } from '../services/authService';
 import { obtenerEstadoReserva, formatearFecha, formatearHora, obtenerNombreCancha } from '../utils/reservaHelpers';
+import { useNotification } from '../hooks/useNotification';
+import Notification from './Notification';
+import ConfirmModal from './ConfirmModal';
 import CanchasDisponibles from './CanchasDisponibles';
 
 function UserDashboard({ user, onLogout }) {
   const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('canchas'); 
+  const [activeTab, setActiveTab] = useState('canchas');
+  const [filtroEstado, setFiltroEstado] = useState('todas'); // 'todas', 'activas', 'canceladas'
+  const [showConfirmCancelar, setShowConfirmCancelar] = useState(false);
+  const [reservaACancelar, setReservaACancelar] = useState(null);
+  const { notification, showNotification, hideNotification } = useNotification(); 
 
   useEffect(() => {
     if (activeTab === 'mis-reservas') {
@@ -20,8 +28,30 @@ function UserDashboard({ user, onLogout }) {
   const fetchReservas = async () => {
     setLoading(true);
     try {
-      const data = await obtenerMisReservas();
-      setReservas(Array.isArray(data) ? data : []);
+      // Usar obtenerReservas() que devuelve todas las reservas del usuario (incluyendo canceladas)
+      // El backend filtra automáticamente por usuario, pero no por estado
+      const data = await obtenerReservas();
+      const todasReservas = Array.isArray(data) ? data : [];
+      
+      // Filtrar solo las reservas del usuario actual (por si acaso)
+      const currentUser = getUser();
+      const reservasUsuario = currentUser?.id || currentUser?.id_usuario
+        ? todasReservas.filter(r => {
+            const reservaUserId = r.id_usuario || r.usuario?.id_usuario;
+            const userId = currentUser.id || currentUser.id_usuario;
+            return reservaUserId === userId;
+          })
+        : todasReservas;
+      
+      // Log para debug: verificar qué reservas estamos recibiendo
+      if (import.meta.env.DEV) {
+        console.log('📋 Reservas recibidas:', reservasUsuario.length);
+        console.log('📋 Estados de reservas:', reservasUsuario.map(r => ({
+          id: r.id_reserva,
+          estado: obtenerEstadoReserva(r)
+        })));
+      }
+      setReservas(reservasUsuario);
     } catch (error) {
       console.error('Error al cargar reservas:', error);
       setReservas([]);
@@ -30,22 +60,57 @@ function UserDashboard({ user, onLogout }) {
     }
   };
 
-  const handleEliminarReserva = async (id) => {
-    if (!window.confirm('¿Estás seguro de que deseas cancelar esta reserva?')) {
-      return;
-    }
+  const handleCancelarReservaClick = (id) => {
+    setReservaACancelar(id);
+    setShowConfirmCancelar(true);
+  };
+
+  const handleConfirmarCancelar = async () => {
+    if (!reservaACancelar) return;
 
     try {
-      await eliminarReserva(id);
-      alert('Reserva cancelada exitosamente');
+      // Actualizar el estado de la reserva a "cancelada" (id_estado_reserva: 3)
+      // Nota: El estado 3 (cancelada) no requiere el campo rechazo, solo el 4 (rechazada) lo requiere
+      await actualizarEstadoReserva(reservaACancelar, 3);
+      showNotification('Reserva cancelada exitosamente', 'success');
+      setShowConfirmCancelar(false);
+      setReservaACancelar(null);
       fetchReservas(); // Recargar la lista
     } catch (error) {
-      alert(error.message || 'Error al cancelar la reserva');
+      showNotification(error.message || 'Error al cancelar la reserva', 'error');
+      setShowConfirmCancelar(false);
+      setReservaACancelar(null);
     }
   };
 
+  const handleCancelarCancelar = () => {
+    setShowConfirmCancelar(false);
+    setReservaACancelar(null);
+  };
+
   return (
-    <div className="dashboard-container">
+    <>
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={notification.duration}
+          onClose={hideNotification}
+        />
+      )}
+      
+      <ConfirmModal
+        isOpen={showConfirmCancelar}
+        onClose={handleCancelarCancelar}
+        onConfirm={handleConfirmarCancelar}
+        title="Confirmar cancelación"
+        message="¿Estás seguro de que deseas cancelar esta reserva?"
+        confirmText="Cancelar reserva"
+        cancelText="No cancelar"
+        type="warning"
+      />
+      
+      <div className="dashboard-container">
       <header className="dashboard-header">
         <div className="header-content">
           <div className="logo-section">
@@ -115,6 +180,16 @@ function UserDashboard({ user, onLogout }) {
                 <p>Pendientes</p>
               </div>
             </div>
+            <div className="stat-card">
+              <FaSignOutAlt className="stat-icon" />
+              <div className="stat-info">
+                <h3>{reservas.filter(r => {
+                  const estado = obtenerEstadoReserva(r);
+                  return estado === 'cancelada' || estado === 'rechazada';
+                }).length}</h3>
+                <p>Canceladas/Rechazadas</p>
+              </div>
+            </div>
           </section>
 
           {/* Sección de Canchas Disponibles */}
@@ -141,22 +216,97 @@ function UserDashboard({ user, onLogout }) {
                 </button>
               </div>
 
+              {/* Filtros de estado */}
+              <div className="filtros-reservas" style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button
+                  className={`filtro-button ${filtroEstado === 'todas' ? 'active' : ''}`}
+                  onClick={() => setFiltroEstado('todas')}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    background: filtroEstado === 'todas' ? '#007bff' : '#fff',
+                    color: filtroEstado === 'todas' ? '#fff' : '#333',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Todas
+                </button>
+                <button
+                  className={`filtro-button ${filtroEstado === 'activas' ? 'active' : ''}`}
+                  onClick={() => setFiltroEstado('activas')}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    background: filtroEstado === 'activas' ? '#28a745' : '#fff',
+                    color: filtroEstado === 'activas' ? '#fff' : '#333',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Activas
+                </button>
+                <button
+                  className={`filtro-button ${filtroEstado === 'canceladas' ? 'active' : ''}`}
+                  onClick={() => setFiltroEstado('canceladas')}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    background: filtroEstado === 'canceladas' ? '#dc3545' : '#fff',
+                    color: filtroEstado === 'canceladas' ? '#fff' : '#333',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Canceladas/Rechazadas
+                </button>
+              </div>
+
               {loading ? (
                 <div className="loading">Cargando reservas...</div>
-              ) : reservas.length === 0 ? (
-                <div className="empty-state">
-                  <PiSoccerBallFill className="empty-icon" />
-                  <p>No tienes reservas aún</p>
-                  <button 
-                    className="new-reserva-button"
-                    onClick={() => setActiveTab('canchas')}
-                  >
-                    Crear Primera Reserva
-                  </button>
-                </div>
-              ) : (
-                <div className="reservas-grid">
-                  {reservas.map((reserva) => {
+              ) : (() => {
+                // Filtrar reservas según el filtro seleccionado
+                const reservasFiltradas = reservas.filter(reserva => {
+                  const estado = obtenerEstadoReserva(reserva);
+                  if (filtroEstado === 'todas') return true;
+                  if (filtroEstado === 'activas') {
+                    return estado === 'pendiente' || estado === 'confirmada';
+                  }
+                  if (filtroEstado === 'canceladas') {
+                    return estado === 'cancelada' || estado === 'rechazada';
+                  }
+                  return true;
+                });
+
+                if (reservasFiltradas.length === 0) {
+                  return (
+                    <div className="empty-state">
+                      <PiSoccerBallFill className="empty-icon" />
+                      <p>
+                        {filtroEstado === 'canceladas' 
+                          ? 'No tienes reservas canceladas o rechazadas' 
+                          : filtroEstado === 'activas'
+                          ? 'No tienes reservas activas'
+                          : 'No tienes reservas aún'}
+                      </p>
+                      {filtroEstado === 'todas' && (
+                        <button 
+                          className="new-reserva-button"
+                          onClick={() => setActiveTab('canchas')}
+                        >
+                          Crear Primera Reserva
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="reservas-grid">
+                    {reservasFiltradas.map((reserva) => {
                     const fecha = formatearFecha(reserva.fecha);
                     const horaInicio = formatearHora(reserva.hora_inicio);
                     const horaFin = formatearHora(reserva.hora_fin);
@@ -187,25 +337,29 @@ function UserDashboard({ user, onLogout }) {
                             </div>
                           )}
                         </div>
-                        <div className="reserva-actions">
-                          <button 
-                            className="action-button delete" 
-                            onClick={() => handleEliminarReserva(reserva.id_reserva)}
-                            disabled={estado === 'cancelada'}
-                          >
-                            {estado === 'cancelada' ? 'Cancelada' : 'Cancelar'}
-                          </button>
-                        </div>
+                        {/* Solo mostrar el botón de cancelar si la reserva no está cancelada ni rechazada */}
+                        {(estado !== 'cancelada' && estado !== 'rechazada') && (
+                          <div className="reserva-actions">
+                            <button 
+                              className="action-button delete" 
+                              onClick={() => handleCancelarReservaClick(reserva.id_reserva)}
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              )}
+                );
+              })()}
             </section>
           )}
         </div>
       </main>
     </div>
+    </>
   );
 }
 

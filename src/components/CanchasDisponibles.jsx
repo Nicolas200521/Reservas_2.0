@@ -3,6 +3,8 @@ import { PiSoccerBallFill } from "react-icons/pi";
 import { FaCalendarAlt, FaClock, FaMapMarkerAlt } from "react-icons/fa";
 import { obtenerCanchas } from '../services/canchasService';
 import { crearReserva, calcularHoraFin } from '../services/reservasService';
+import { useNotification } from '../hooks/useNotification';
+import Notification from './Notification';
 import './CanchasDisponibles.css';
 
 function CanchasDisponibles({ user, onReservaCreada }) {
@@ -17,6 +19,7 @@ function CanchasDisponibles({ user, onReservaCreada }) {
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { notification, showNotification, hideNotification } = useNotification();
 
   useEffect(() => {
     fetchCanchas();
@@ -82,15 +85,17 @@ function CanchasDisponibles({ user, onReservaCreada }) {
       setShowModal(false);
       setCanchaSeleccionada(null);
       
-      // Mostrar mensaje de éxito
-      alert('¡Reserva creada exitosamente! Tu reserva está pendiente de aprobación por el administrador.');
+      // Mostrar notificación de éxito
+      showNotification('¡Reserva creada exitosamente! Tu reserva está pendiente de aprobación por el administrador.', 'success');
       
       // Notificar al componente padre
       if (onReservaCreada) {
         onReservaCreada(response.reserva || response);
       }
     } catch (err) {
-      setError(err.message || 'Error al crear la reserva. Intenta nuevamente.');
+      const errorMessage = err.message || 'Error al crear la reserva. Intenta nuevamente.';
+      setError(errorMessage);
+      showNotification(errorMessage, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -108,6 +113,14 @@ function CanchasDisponibles({ user, onReservaCreada }) {
 
   return (
     <>
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          duration={notification.duration}
+          onClose={hideNotification}
+        />
+      )}
       <section className="canchas-section">
         <div className="section-header">
           <h2>Canchas Disponibles</h2>

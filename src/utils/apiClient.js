@@ -16,6 +16,10 @@ export const apiRequest = async (url, options = {}) => {
     throw new Error('Token expirado. Por favor, inicia sesión nuevamente.');
   }
 
+  if (!token) {
+    throw new Error('No hay token de autenticación. Por favor, inicia sesión.');
+  }
+
   const headers = getAuthHeaders();
   
   // Merge con headers personalizados si existen
@@ -23,6 +27,20 @@ export const apiRequest = async (url, options = {}) => {
     ...headers,
     ...(options.headers || {}),
   };
+
+  // Log para debugging (solo en desarrollo)
+  if (import.meta.env.DEV) {
+    console.log('🔐 Petición autenticada:', {
+      url,
+      method: options.method || 'GET',
+      hasToken: !!token,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'none',
+      headers: {
+        'Authorization': token ? `Bearer ${token.substring(0, 20)}...` : 'none',
+        'Content-Type': 'application/json'
+      }
+    });
+  }
 
   const config = {
     ...options,
@@ -38,8 +56,19 @@ export const apiRequest = async (url, options = {}) => {
       throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
     }
     
+    // Si no tiene permisos (403), lanzar error con mensaje más descriptivo
+    if (response.status === 403) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.error || errorData.message || 'No tienes permisos para realizar esta acción';
+      throw new Error(errorMessage);
+    }
+    
     return response;
   } catch (error) {
+    // Si ya es un Error con mensaje, relanzarlo
+    if (error instanceof Error && error.message) {
+      throw error;
+    }
     console.error('Error en petición API:', error);
     throw error;
   }
@@ -93,8 +122,45 @@ export const apiPost = async (url, data) => {
  * PUT request autenticado
  */
 export const apiPut = async (url, data) => {
+  // Validar que los datos sean un objeto válido
+  if (!data || typeof data !== 'object') {
+    throw new Error('Los datos a actualizar deben ser un objeto válido');
+  }
+  
+  // Log para debugging (solo en desarrollo)
+  if (import.meta.env.DEV) {
+    console.log('📝 Actualizando reserva:', {
+      url,
+      datos: data
+    });
+  }
+  
   const response = await apiRequest(url, {
     method: 'PUT',
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+};
+
+/**
+ * PATCH request autenticado
+ */
+export const apiPatch = async (url, data) => {
+  // Validar que los datos sean un objeto válido
+  if (!data || typeof data !== 'object') {
+    throw new Error('Los datos a actualizar deben ser un objeto válido');
+  }
+  
+  // Log para debugging (solo en desarrollo)
+  if (import.meta.env.DEV) {
+    console.log('🔧 PATCH request:', {
+      url,
+      datos: data
+    });
+  }
+  
+  const response = await apiRequest(url, {
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
   return handleResponse(response);

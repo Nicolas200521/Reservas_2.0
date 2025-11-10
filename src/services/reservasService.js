@@ -1,6 +1,6 @@
 // Servicio para gestión de reservas
 import { API_ENDPOINTS } from '../config/api';
-import { apiGet, apiPost, apiPut, apiDelete } from '../utils/apiClient';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../utils/apiClient';
 import { getUser } from './authService';
 
 /**
@@ -75,7 +75,11 @@ export const crearReserva = async (datos) => {
  * Actualiza una reserva
  * Solo el dueño o admin puede actualizar
  * @param {number} id - ID de la reserva a actualizar
- * @param {Object} datos - Datos a actualizar (fecha, hora_inicio, hora_fin)
+ * @param {Object} datos - Datos a actualizar (fecha, hora_inicio, hora_fin, id_estado_reserva)
+ *   - fecha: Formato YYYY-MM-DD
+ *   - hora_inicio: Formato HH:MM
+ *   - hora_fin: Formato HH:MM
+ *   - id_estado_reserva: 1 (pendiente), 2 (confirmada), 3 (cancelada)
  * @returns {Promise<Object>} Reserva actualizada
  */
 export const actualizarReserva = async (id, datos) => {
@@ -84,6 +88,41 @@ export const actualizarReserva = async (id, datos) => {
     return reserva;
   } catch (error) {
     console.error(`Error al actualizar reserva ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza el estado de una reserva usando el endpoint específico PATCH /api/reservas/:id/estado
+ * @param {number} id - ID de la reserva
+ * @param {number} idEstadoReserva - ID del estado (1: pendiente, 2: confirmada, 3: cancelada, 4: rechazada)
+ * @param {string} rechazo - Motivo de rechazo (requerido cuando idEstadoReserva es 4)
+ * @returns {Promise<Object>} Reserva actualizada
+ */
+export const actualizarEstadoReserva = async (id, idEstadoReserva, rechazo = null) => {
+  try {
+    if (!id || isNaN(id)) {
+      throw new Error('ID de reserva inválido');
+    }
+    if (!idEstadoReserva || ![1, 2, 3, 4].includes(idEstadoReserva)) {
+      throw new Error('ID de estado inválido. Debe ser 1 (pendiente), 2 (confirmada), 3 (cancelada) o 4 (rechazada)');
+    }
+    
+    // Construir el body del request
+    const body = {
+      id_estado_reserva: idEstadoReserva
+    };
+    
+    // Si el estado es rechazada (4), incluir el motivo de rechazo si se proporciona
+    // Si no se proporciona, usar un valor por defecto
+    if (idEstadoReserva === 4) {
+      body.rechazo = rechazo && rechazo.trim() ? rechazo.trim() : 'Reserva rechazada por el administrador';
+    }
+    
+    const reserva = await apiPatch(API_ENDPOINTS.RESERVAS.ESTADO(id), body);
+    return reserva;
+  } catch (error) {
+    console.error(`Error al actualizar estado de reserva ${id}:`, error);
     throw error;
   }
 };
