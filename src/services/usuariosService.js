@@ -9,6 +9,8 @@ import { getUser } from './authService';
  */
 export const obtenerUsuarios = async () => {
   try {
+    // El apiGet ya incluye automáticamente el token en el header Authorization
+    // usando el formato: Authorization: Bearer ${token}
     const usuarios = await apiGet(API_ENDPOINTS.USUARIOS.BASE);
     return Array.isArray(usuarios) ? usuarios : [];
   } catch (error) {
