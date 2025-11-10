@@ -36,8 +36,13 @@ export const API_ENDPOINTS = {
     FORGOT_PASSWORD: `${API_BASE_URL}/api/auth/forgot-password`,
     PROFILE: `${API_BASE_URL}/api/auth/profile`,
   },
+  USUARIOS: {
+    BASE: `${API_BASE_URL}/api/usuarios`,
+    BY_ID: (id) => `${API_BASE_URL}/api/usuarios/${id}`,
+  },
   RESERVAS: {
     BASE: `${API_BASE_URL}/api/reservas`,
+    MIS_RESERVAS: `${API_BASE_URL}/api/reservas/mis-reservas`,
     BY_ID: (id) => `${API_BASE_URL}/api/reservas/${id}`,
   },
   CANCHAS: {

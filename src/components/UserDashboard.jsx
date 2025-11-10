@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaSignOutAlt, FaCalendarAlt, FaUser, FaFutbol } from "react-icons/fa";
 import './Dashboard.css';
-import { API_ENDPOINTS } from '../config/api';
-import { apiGet } from '../utils/apiClient';
+import { obtenerMisReservas, eliminarReserva } from '../services/reservasService';
+import { obtenerEstadoReserva, formatearFecha, formatearHora, obtenerNombreCancha } from '../utils/reservaHelpers';
 import CanchasDisponibles from './CanchasDisponibles';
 
 function UserDashboard({ user, onLogout }) {
@@ -20,13 +20,27 @@ function UserDashboard({ user, onLogout }) {
   const fetchReservas = async () => {
     setLoading(true);
     try {
-      const data = await apiGet(API_ENDPOINTS.RESERVAS.BASE);
-      setReservas(Array.isArray(data) ? data : data.reservas || []);
+      const data = await obtenerMisReservas();
+      setReservas(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar reservas:', error);
       setReservas([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEliminarReserva = async (id) => {
+    if (!window.confirm('¿Estás seguro de que deseas cancelar esta reserva?')) {
+      return;
+    }
+
+    try {
+      await eliminarReserva(id);
+      alert('Reserva cancelada exitosamente');
+      fetchReservas(); // Recargar la lista
+    } catch (error) {
+      alert(error.message || 'Error al cancelar la reserva');
     }
   };
 
@@ -90,14 +104,14 @@ function UserDashboard({ user, onLogout }) {
             <div className="stat-card">
               <PiSoccerBallFill className="stat-icon" />
               <div className="stat-info">
-                <h3>{reservas.filter(r => r.estado === 'confirmada').length}</h3>
+                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'confirmada').length}</h3>
                 <p>Reservas Confirmadas</p>
               </div>
             </div>
             <div className="stat-card">
               <FaCalendarAlt className="stat-icon" />
               <div className="stat-info">
-                <h3>{reservas.filter(r => r.estado === 'pendiente').length}</h3>
+                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'pendiente').length}</h3>
                 <p>Pendientes</p>
               </div>
             </div>
@@ -142,34 +156,49 @@ function UserDashboard({ user, onLogout }) {
                 </div>
               ) : (
                 <div className="reservas-grid">
-                  {reservas.map((reserva) => (
-                    <div key={reserva.id} className="reserva-card">
-                      <div className="reserva-header">
-                        <h3>{reserva.cancha}</h3>
-                        <span className={`estado-badge ${reserva.estado}`}>
-                          {reserva.estado}
-                        </span>
-                      </div>
-                      <div className="reserva-details">
-                        <div className="detail-item">
-                          <span className="detail-label">Fecha:</span>
-                          <span className="detail-value">{reserva.fecha}</span>
+                  {reservas.map((reserva) => {
+                    const fecha = formatearFecha(reserva.fecha);
+                    const horaInicio = formatearHora(reserva.hora_inicio);
+                    const horaFin = formatearHora(reserva.hora_fin);
+                    const canchaNombre = obtenerNombreCancha(reserva);
+                    const estado = obtenerEstadoReserva(reserva);
+                    
+                    return (
+                      <div key={reserva.id_reserva} className="reserva-card">
+                        <div className="reserva-header">
+                          <h3>{canchaNombre}</h3>
+                          <span className={`estado-badge ${estado}`}>
+                            {estado}
+                          </span>
                         </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Hora:</span>
-                          <span className="detail-value">{reserva.hora}</span>
+                        <div className="reserva-details">
+                          <div className="detail-item">
+                            <span className="detail-label">Fecha:</span>
+                            <span className="detail-value">{fecha}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">Hora:</span>
+                            <span className="detail-value">{horaInicio} - {horaFin}</span>
+                          </div>
+                          {reserva.codigo_acceso && (
+                            <div className="detail-item">
+                              <span className="detail-label">Código:</span>
+                              <span className="detail-value">{reserva.codigo_acceso}</span>
+                            </div>
+                          )}
                         </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Duración:</span>
-                          <span className="detail-value">{reserva.duracion} min</span>
+                        <div className="reserva-actions">
+                          <button 
+                            className="action-button delete" 
+                            onClick={() => handleEliminarReserva(reserva.id_reserva)}
+                            disabled={estado === 'cancelada'}
+                          >
+                            {estado === 'cancelada' ? 'Cancelada' : 'Cancelar'}
+                          </button>
                         </div>
                       </div>
-                      <div className="reserva-actions">
-                        <button className="action-button edit">Editar</button>
-                        <button className="action-button delete">Cancelar</button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>

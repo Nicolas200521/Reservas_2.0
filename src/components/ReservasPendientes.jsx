@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaCheck, FaTimes, FaUser, FaCalendarAlt, FaClock } from "react-icons/fa";
-import { API_ENDPOINTS } from '../config/api';
-import { apiGet, apiPut } from '../utils/apiClient';
+import { obtenerReservas, actualizarReserva } from '../services/reservasService';
+import { formatearFecha, formatearHora, calcularDuracion, obtenerNombreCancha, obtenerNombreUsuario } from '../utils/reservaHelpers';
 import './ReservasPendientes.css';
 
 function ReservasPendientes({ onReservaActualizada }) {
@@ -15,11 +15,14 @@ function ReservasPendientes({ onReservaActualizada }) {
   }, []);
 
   const fetchReservasPendientes = async () => {
+    setLoading(true);
     try {
-      const data = await apiGet(API_ENDPOINTS.RESERVAS.BASE);
-      const reservas = Array.isArray(data) ? data : data.reservas || [];
-      // Filtrar solo las reservas pendientes
-      const pendientes = reservas.filter(r => r.estado === 'pendiente');
+      const data = await obtenerReservas();
+      const reservas = Array.isArray(data) ? data : [];
+      // Filtrar solo las reservas pendientes usando estado_reserva_rel
+      const pendientes = reservas.filter(r => 
+        r.estado_reserva_rel?.estado_reserva === 'pendiente'
+      );
       setReservasPendientes(pendientes);
     } catch (error) {
       console.error('Error al cargar reservas pendientes:', error);
@@ -32,13 +35,17 @@ function ReservasPendientes({ onReservaActualizada }) {
   const handleAceptar = async (reservaId) => {
     setProcessingId(reservaId);
     try {
-      await apiPut(API_ENDPOINTS.RESERVAS.BY_ID(reservaId), {
-        estado: 'confirmada'
+      // El backend espera que actualicemos el id_estado_reserva a 2 (confirmada)
+      // Pero según la documentación, solo podemos actualizar fecha, hora_inicio y hora_fin
+      // Necesitamos verificar si el backend acepta actualizar el estado directamente
+      // Por ahora, intentamos actualizar con id_estado_reserva
+      await actualizarReserva(reservaId, {
+        id_estado_reserva: 2
       });
       
       // Actualizar la lista
       setReservasPendientes(prev => 
-        prev.filter(r => r.id !== reservaId)
+        prev.filter(r => r.id_reserva !== reservaId)
       );
       
       // Mostrar mensaje de éxito
@@ -48,24 +55,32 @@ function ReservasPendientes({ onReservaActualizada }) {
       if (onReservaActualizada) {
         onReservaActualizada();
       }
+      
+      // Recargar la lista
+      fetchReservasPendientes();
     } catch (error) {
       console.error('Error al aceptar reserva:', error);
-      alert('Error al aceptar la reserva. Intenta nuevamente.');
+      alert(error.message || 'Error al aceptar la reserva. Intenta nuevamente.');
     } finally {
       setProcessingId(null);
     }
   };
 
   const handleRechazar = async (reservaId) => {
+    if (!window.confirm('¿Estás seguro de que deseas rechazar esta reserva?')) {
+      return;
+    }
+    
     setProcessingId(reservaId);
     try {
-      await apiPut(API_ENDPOINTS.RESERVAS.BY_ID(reservaId), {
-        estado: 'rechazada'
+      // El backend espera que actualicemos el id_estado_reserva a 3 (cancelada/rechazada)
+      await actualizarReserva(reservaId, {
+        id_estado_reserva: 3
       });
       
       // Actualizar la lista
       setReservasPendientes(prev => 
-        prev.filter(r => r.id !== reservaId)
+        prev.filter(r => r.id_reserva !== reservaId)
       );
       
       // Mostrar mensaje de éxito
@@ -75,9 +90,12 @@ function ReservasPendientes({ onReservaActualizada }) {
       if (onReservaActualizada) {
         onReservaActualizada();
       }
+      
+      // Recargar la lista
+      fetchReservasPendientes();
     } catch (error) {
       console.error('Error al rechazar reserva:', error);
-      alert('Error al rechazar la reserva. Intenta nuevamente.');
+      alert(error.message || 'Error al rechazar la reserva. Intenta nuevamente.');
     } finally {
       setProcessingId(null);
     }
@@ -102,85 +120,90 @@ function ReservasPendientes({ onReservaActualizada }) {
         </div>
       ) : (
         <div className="reservas-pendientes-grid">
-          {reservasPendientes.map((reserva) => (
-            <div key={reserva.id} className="reserva-pendiente-card">
-              <div className="reserva-pendiente-header">
-                <div className="cancha-info-header">
-                  <PiSoccerBallFill className="cancha-icon-small" />
-                  <h3>{reserva.cancha}</h3>
-                </div>
-                <span className="estado-badge pendiente">Pendiente</span>
-              </div>
-
-              <div className="reserva-pendiente-details">
-                <div className="detail-row">
-                  <FaUser className="detail-icon" />
-                  <div className="detail-content">
-                    <span className="detail-label">Solicitado por:</span>
-                    <span className="detail-value">{reserva.usuarioNombre || `Usuario ID: ${reserva.usuarioId}`}</span>
+          {reservasPendientes.map((reserva) => {
+            const fecha = formatearFecha(reserva.fecha);
+            const horaInicio = formatearHora(reserva.hora_inicio);
+            const horaFin = formatearHora(reserva.hora_fin);
+            const canchaNombre = obtenerNombreCancha(reserva);
+            const usuarioNombre = obtenerNombreUsuario(reserva);
+            const duracion = calcularDuracion(reserva.hora_inicio, reserva.hora_fin);
+            
+            return (
+              <div key={reserva.id_reserva} className="reserva-pendiente-card">
+                <div className="reserva-pendiente-header">
+                  <div className="cancha-info-header">
+                    <PiSoccerBallFill className="cancha-icon-small" />
+                    <h3>{canchaNombre}</h3>
                   </div>
+                  <span className="estado-badge pendiente">Pendiente</span>
                 </div>
 
-                <div className="detail-row">
-                  <FaCalendarAlt className="detail-icon" />
-                  <div className="detail-content">
-                    <span className="detail-label">Fecha:</span>
-                    <span className="detail-value">{reserva.fecha}</span>
-                  </div>
-                </div>
-
-                <div className="detail-row">
-                  <FaClock className="detail-icon" />
-                  <div className="detail-content">
-                    <span className="detail-label">Hora:</span>
-                    <span className="detail-value">{reserva.hora}</span>
-                  </div>
-                </div>
-
-                <div className="detail-row">
-                  <PiSoccerBallFill className="detail-icon" />
-                  <div className="detail-content">
-                    <span className="detail-label">Duración:</span>
-                    <span className="detail-value">{reserva.duracion} minutos</span>
-                  </div>
-                </div>
-
-                {reserva.createdAt && (
+                <div className="reserva-pendiente-details">
                   <div className="detail-row">
-                    <span className="detail-label">Solicitado el:</span>
-                    <span className="detail-value">
-                      {new Date(reserva.createdAt).toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
+                    <FaUser className="detail-icon" />
+                    <div className="detail-content">
+                      <span className="detail-label">Solicitado por:</span>
+                      <span className="detail-value">{usuarioNombre}</span>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              <div className="reserva-pendiente-actions">
-                <button
-                  className="action-button aceptar"
-                  onClick={() => handleAceptar(reserva.id)}
-                  disabled={processingId === reserva.id}
-                >
-                  <FaCheck />
-                  <span>{processingId === reserva.id ? 'Procesando...' : 'Aceptar'}</span>
-                </button>
-                <button
-                  className="action-button rechazar"
-                  onClick={() => handleRechazar(reserva.id)}
-                  disabled={processingId === reserva.id}
-                >
-                  <FaTimes />
-                  <span>{processingId === reserva.id ? 'Procesando...' : 'Rechazar'}</span>
-                </button>
+                  <div className="detail-row">
+                    <FaCalendarAlt className="detail-icon" />
+                    <div className="detail-content">
+                      <span className="detail-label">Fecha:</span>
+                      <span className="detail-value">{fecha}</span>
+                    </div>
+                  </div>
+
+                  <div className="detail-row">
+                    <FaClock className="detail-icon" />
+                    <div className="detail-content">
+                      <span className="detail-label">Hora:</span>
+                      <span className="detail-value">{horaInicio} - {horaFin}</span>
+                    </div>
+                  </div>
+
+                  {duracion > 0 && (
+                    <div className="detail-row">
+                      <PiSoccerBallFill className="detail-icon" />
+                      <div className="detail-content">
+                        <span className="detail-label">Duración:</span>
+                        <span className="detail-value">{duracion} minutos</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {reserva.codigo_acceso && (
+                    <div className="detail-row">
+                      <div className="detail-content">
+                        <span className="detail-label">Código de acceso:</span>
+                        <span className="detail-value">{reserva.codigo_acceso}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="reserva-pendiente-actions">
+                  <button
+                    className="action-button aceptar"
+                    onClick={() => handleAceptar(reserva.id_reserva)}
+                    disabled={processingId === reserva.id_reserva}
+                  >
+                    <FaCheck />
+                    <span>{processingId === reserva.id_reserva ? 'Procesando...' : 'Aceptar'}</span>
+                  </button>
+                  <button
+                    className="action-button rechazar"
+                    onClick={() => handleRechazar(reserva.id_reserva)}
+                    disabled={processingId === reserva.id_reserva}
+                  >
+                    <FaTimes />
+                    <span>{processingId === reserva.id_reserva ? 'Procesando...' : 'Rechazar'}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

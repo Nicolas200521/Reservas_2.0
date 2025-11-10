@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaCalendarAlt, FaClock, FaMapMarkerAlt } from "react-icons/fa";
-import { API_ENDPOINTS } from '../config/api';
-import { apiGet, apiPost } from '../utils/apiClient';
+import { obtenerCanchas } from '../services/canchasService';
+import { crearReserva, calcularHoraFin } from '../services/reservasService';
 import './CanchasDisponibles.css';
 
 function CanchasDisponibles({ user, onReservaCreada }) {
@@ -23,16 +23,18 @@ function CanchasDisponibles({ user, onReservaCreada }) {
   }, []);
 
   const fetchCanchas = async () => {
+    setLoading(true);
     try {
-      // En producción, esto vendría de un endpoint /api/canchas
-      // Por ahora, usamos datos mock
-      const canchasMock = [
-        { id: 1, nombre: 'Cancha 1', tipo: 'Fútbol 11', precio: 50000, disponible: true },
-        { id: 2, nombre: 'Cancha 2', tipo: 'Fútbol 7', precio: 40000, disponible: true },
-        { id: 3, nombre: 'Cancha 3', tipo: 'Fútbol 5', precio: 30000, disponible: true },
-        { id: 4, nombre: 'Cancha 4', tipo: 'Fútbol 11', precio: 50000, disponible: false },
-      ];
-      setCanchas(canchasMock);
+      const canchasData = await obtenerCanchas();
+      // Mapear los datos del backend al formato esperado por el componente
+      const canchasFormateadas = canchasData.map(cancha => ({
+        id: cancha.id_cancha,
+        nombre: cancha.nombre,
+        tipo: cancha.tipo_cesped || 'Sintético',
+        precio: cancha.precio_hora || 0,
+        disponible: cancha.estado === 'activa'
+      }));
+      setCanchas(canchasFormateadas);
     } catch (error) {
       console.error('Error al cargar canchas:', error);
       setCanchas([]);
@@ -66,13 +68,15 @@ function CanchasDisponibles({ user, onReservaCreada }) {
     }
 
     try {
-      const response = await apiPost(API_ENDPOINTS.RESERVAS.BASE, {
-        cancha: canchaSeleccionada.nombre,
+      // Calcular hora de fin basada en la duración
+      const horaFin = calcularHoraFin(formData.hora, formData.duracion);
+      
+      // Crear la reserva usando el servicio
+      const response = await crearReserva({
+        id_cancha: canchaSeleccionada.id,
         fecha: formData.fecha,
-        hora: formData.hora,
-        duracion: formData.duracion,
-        usuarioId: user?.id,
-        estado: 'pendiente' // Todas las reservas se crean con estado pendiente
+        hora_inicio: formData.hora,
+        hora_fin: horaFin
       });
 
       setShowModal(false);

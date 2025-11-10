@@ -46,11 +46,36 @@ export const apiRequest = async (url, options = {}) => {
 };
 
 /**
+ * Maneja la respuesta y extrae el JSON o lanza un error
+ */
+const handleResponse = async (response) => {
+  const contentType = response.headers.get('content-type');
+  const isJson = contentType && contentType.includes('application/json');
+  
+  let data;
+  if (isJson) {
+    data = await response.json();
+  } else {
+    // Si no es JSON, intentar leer como texto
+    const text = await response.text();
+    data = text ? { message: text } : {};
+  }
+  
+  // Si la respuesta no es exitosa, lanzar error con el mensaje del servidor
+  if (!response.ok) {
+    const errorMessage = data.error || data.message || `Error ${response.status}: ${response.statusText}`;
+    throw new Error(errorMessage);
+  }
+  
+  return data;
+};
+
+/**
  * GET request autenticado
  */
 export const apiGet = async (url) => {
   const response = await apiRequest(url, { method: 'GET' });
-  return response.json();
+  return handleResponse(response);
 };
 
 /**
@@ -61,7 +86,7 @@ export const apiPost = async (url, data) => {
     method: 'POST',
     body: JSON.stringify(data),
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 /**
@@ -72,7 +97,7 @@ export const apiPut = async (url, data) => {
     method: 'PUT',
     body: JSON.stringify(data),
   });
-  return response.json();
+  return handleResponse(response);
 };
 
 /**
@@ -80,6 +105,6 @@ export const apiPut = async (url, data) => {
  */
 export const apiDelete = async (url) => {
   const response = await apiRequest(url, { method: 'DELETE' });
-  return response.json();
+  return handleResponse(response);
 };
 
