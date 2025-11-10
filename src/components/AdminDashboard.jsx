@@ -2,29 +2,46 @@ import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaSignOutAlt, FaCalendarAlt, FaUsers, FaShieldAlt } from "react-icons/fa";
 import './Dashboard.css';
-import { API_ENDPOINTS } from '../config/api';
-import { apiGet } from '../utils/apiClient';
+import { obtenerReservas } from '../services/reservasService';
+import { obtenerUsuarios } from '../services/usuariosService';
+import { obtenerEstadoReserva, formatearFecha, formatearHora, obtenerNombreCancha, obtenerNombreUsuario } from '../utils/reservaHelpers';
 import ReservasPendientes from './ReservasPendientes';
 
 function AdminDashboard({ user, onLogout }) {
   const [reservas, setReservas] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pendientes'); // 'pendientes', 'reservas', 'usuarios'
 
   useEffect(() => {
     if (activeTab === 'reservas') {
       fetchReservas();
+    } else if (activeTab === 'usuarios') {
+      fetchUsuarios();
     }
   }, [activeTab]);
 
   const fetchReservas = async () => {
     setLoading(true);
     try {
-      const data = await apiGet(API_ENDPOINTS.RESERVAS.BASE);
-      setReservas(Array.isArray(data) ? data : data.reservas || []);
+      const data = await obtenerReservas();
+      setReservas(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar reservas:', error);
       setReservas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsuarios = async () => {
+    setLoading(true);
+    try {
+      const data = await obtenerUsuarios();
+      setUsuarios(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error);
+      setUsuarios([]);
     } finally {
       setLoading(false);
     }
@@ -93,14 +110,14 @@ function AdminDashboard({ user, onLogout }) {
             <div className="stat-card">
               <FaCalendarAlt className="stat-icon" />
               <div className="stat-info">
-                <h3>{reservas.filter(r => r.estado === 'pendiente').length}</h3>
+                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'pendiente').length}</h3>
                 <p>Reservas Pendientes</p>
               </div>
             </div>
             <div className="stat-card">
               <PiSoccerBallFill className="stat-icon" />
               <div className="stat-info">
-                <h3>{reservas.filter(r => r.estado === 'confirmada').length}</h3>
+                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'confirmada').length}</h3>
                 <p>Reservas Confirmadas</p>
               </div>
             </div>
@@ -139,34 +156,45 @@ function AdminDashboard({ user, onLogout }) {
                 </div>
               ) : (
                 <div className="reservas-grid">
-                  {reservas.map((reserva) => (
-                    <div key={reserva.id} className="reserva-card">
-                      <div className="reserva-header">
-                        <h3>{reserva.cancha}</h3>
-                        <span className={`estado-badge ${reserva.estado}`}>
-                          {reserva.estado}
-                        </span>
+                  {reservas.map((reserva) => {
+                    const fecha = formatearFecha(reserva.fecha);
+                    const horaInicio = formatearHora(reserva.hora_inicio);
+                    const horaFin = formatearHora(reserva.hora_fin);
+                    const canchaNombre = obtenerNombreCancha(reserva);
+                    const usuarioNombre = obtenerNombreUsuario(reserva);
+                    const estado = obtenerEstadoReserva(reserva);
+                    
+                    return (
+                      <div key={reserva.id_reserva} className="reserva-card">
+                        <div className="reserva-header">
+                          <h3>{canchaNombre}</h3>
+                          <span className={`estado-badge ${estado}`}>
+                            {estado}
+                          </span>
+                        </div>
+                        <div className="reserva-details">
+                          <div className="detail-item">
+                            <span className="detail-label">Usuario:</span>
+                            <span className="detail-value">{usuarioNombre}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">Fecha:</span>
+                            <span className="detail-value">{fecha}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">Hora:</span>
+                            <span className="detail-value">{horaInicio} - {horaFin}</span>
+                          </div>
+                          {reserva.codigo_acceso && (
+                            <div className="detail-item">
+                              <span className="detail-label">Código:</span>
+                              <span className="detail-value">{reserva.codigo_acceso}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="reserva-details">
-                        <div className="detail-item">
-                          <span className="detail-label">Usuario:</span>
-                          <span className="detail-value">{reserva.usuarioNombre || `ID: ${reserva.usuarioId}`}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Fecha:</span>
-                          <span className="detail-value">{reserva.fecha}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Hora:</span>
-                          <span className="detail-value">{reserva.hora}</span>
-                        </div>
-                        <div className="detail-item">
-                          <span className="detail-label">Duración:</span>
-                          <span className="detail-value">{reserva.duracion} min</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -177,17 +205,45 @@ function AdminDashboard({ user, onLogout }) {
             <section className="usuarios-section">
               <div className="section-header">
                 <h2>Gestión de Usuarios</h2>
-                <button className="new-reserva-button">
-                  + Nuevo Usuario
-                </button>
               </div>
-              <div className="admin-placeholder">
-                <FaUsers className="placeholder-icon" />
-                <p>Panel de gestión de usuarios</p>
-                <p className="placeholder-note">
-                  Aquí podrás ver, crear, editar y eliminar usuarios del sistema
-                </p>
-              </div>
+
+              {loading ? (
+                <div className="loading">Cargando usuarios...</div>
+              ) : usuarios.length === 0 ? (
+                <div className="empty-state">
+                  <FaUsers className="empty-icon" />
+                  <p>No hay usuarios registrados</p>
+                </div>
+              ) : (
+                <div className="reservas-grid">
+                  {usuarios.map((usuario) => (
+                    <div key={usuario.id_usuario} className="reserva-card">
+                      <div className="reserva-header">
+                        <h3>{usuario.nombre}</h3>
+                        <span className={`estado-badge ${usuario.rol === 'admin' ? 'admin' : 'user'}`}>
+                          {usuario.rol === 'admin' ? 'Admin' : 'Usuario'}
+                        </span>
+                      </div>
+                      <div className="reserva-details">
+                        <div className="detail-item">
+                          <span className="detail-label">Correo:</span>
+                          <span className="detail-value">{usuario.correo}</span>
+                        </div>
+                        {usuario.telefono && (
+                          <div className="detail-item">
+                            <span className="detail-label">Teléfono:</span>
+                            <span className="detail-value">{usuario.telefono}</span>
+                          </div>
+                        )}
+                        <div className="detail-item">
+                          <span className="detail-label">ID:</span>
+                          <span className="detail-value">{usuario.id_usuario}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
         </div>
