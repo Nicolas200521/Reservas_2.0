@@ -1,11 +1,18 @@
 // Utilidades para trabajar con reservas
 /**
  * Obtiene el estado de una reserva como string
+ * Usa la relación estado_reserva_rel que viene del backend/DB como fuente de verdad
  * @param {Object} reserva - Objeto de reserva del backend
- * @returns {string} Estado de la reserva ('pendiente', 'confirmada', 'cancelada')
+ * @returns {string} Estado de la reserva ('pendiente', 'confirmada', 'cancelada', 'rechazada')
  */
 export const obtenerEstadoReserva = (reserva) => {
-  return reserva.estado_reserva_rel?.estado_reserva || 'pendiente';
+  // Usar estado_reserva_rel como fuente de verdad (viene de la DB)
+  if (reserva.estado_reserva_rel?.estado_reserva) {
+    return reserva.estado_reserva_rel.estado_reserva;
+  }
+  
+  // Fallback: si no hay relación, usar pendiente por defecto
+  return 'pendiente';
 };
 
 /**

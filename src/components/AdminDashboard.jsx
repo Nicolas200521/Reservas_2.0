@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
-import { FaSignOutAlt, FaCalendarAlt, FaUsers, FaShieldAlt, FaTimes, FaTrash } from "react-icons/fa";
+import { FaSignOutAlt, FaCalendarAlt, FaUsers, FaShieldAlt, FaTimes, FaTrash, FaCheckCircle } from "react-icons/fa";
 import './Dashboard.css';
 import { obtenerReservas } from '../services/reservasService';
 import { obtenerUsuarios, eliminarUsuario } from '../services/usuariosService';
@@ -12,12 +12,14 @@ import ReservasPendientes from './ReservasPendientes';
 
 function AdminDashboard({ user, onLogout }) {
   const [reservas, setReservas] = useState([]);
+  const [reservasConfirmadas, setReservasConfirmadas] = useState([]);
   const [reservasCanceladas, setReservasCanceladas] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
   const [loadingCanceladas, setLoadingCanceladas] = useState(false);
-  const [activeTab, setActiveTab] = useState('pendientes'); // 'pendientes', 'reservas', 'canceladas', 'usuarios'
+  const [loadingConfirmadas, setLoadingConfirmadas] = useState(false);
+  const [activeTab, setActiveTab] = useState('pendientes'); // 'pendientes', 'confirmadas', 'reservas', 'canceladas', 'usuarios'
   const [eliminandoUsuarioId, setEliminandoUsuarioId] = useState(null);
   const [showConfirmEliminar, setShowConfirmEliminar] = useState(false);
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null);
@@ -29,6 +31,8 @@ function AdminDashboard({ user, onLogout }) {
     
     if (activeTab === 'reservas') {
       fetchReservas();
+    } else if (activeTab === 'confirmadas') {
+      fetchReservasConfirmadas();
     } else if (activeTab === 'canceladas') {
       fetchReservasCanceladas();
     } else if (activeTab === 'usuarios') {
@@ -46,6 +50,24 @@ function AdminDashboard({ user, onLogout }) {
       setReservas([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReservasConfirmadas = async () => {
+    setLoadingConfirmadas(true);
+    try {
+      const data = await obtenerReservas();
+      const todasReservas = Array.isArray(data) ? data : [];
+      // Filtrar solo las reservas confirmadas
+      const confirmadas = todasReservas.filter(r => 
+        obtenerEstadoReserva(r) === 'confirmada'
+      );
+      setReservasConfirmadas(confirmadas);
+    } catch (error) {
+      console.error('Error al cargar reservas confirmadas:', error);
+      setReservasConfirmadas([]);
+    } finally {
+      setLoadingConfirmadas(false);
     }
   };
 
@@ -202,6 +224,13 @@ function AdminDashboard({ user, onLogout }) {
               <span>Reservas Pendientes</span>
             </button>
             <button 
+              className={`tab-button ${activeTab === 'confirmadas' ? 'active' : ''}`}
+              onClick={() => setActiveTab('confirmadas')}
+            >
+              <FaCheckCircle />
+              <span>Reservas Confirmadas</span>
+            </button>
+            <button 
               className={`tab-button ${activeTab === 'reservas' ? 'active' : ''}`}
               onClick={() => setActiveTab('reservas')}
             >
@@ -261,12 +290,76 @@ function AdminDashboard({ user, onLogout }) {
               onReservaActualizada={() => {
                 // Recargar todas las reservas para actualizar estadísticas
                 fetchReservas();
+                // Recargar reservas confirmadas cuando se acepta una reserva
+                fetchReservasConfirmadas();
                 // Si estamos viendo canceladas, recargarlas también
                 if (activeTab === 'canceladas') {
                   fetchReservasCanceladas();
                 }
               }}
             />
+          )}
+
+          {/* Sección de Reservas Confirmadas */}
+          {activeTab === 'confirmadas' && (
+            <section className="reservas-section">
+              <div className="section-header">
+                <h2>Reservas Confirmadas</h2>
+                <span className="badge-count">{reservasConfirmadas.length}</span>
+              </div>
+
+              {loadingConfirmadas ? (
+                <div className="loading">Cargando reservas confirmadas...</div>
+              ) : reservasConfirmadas.length === 0 ? (
+                <div className="empty-state">
+                  <FaCheckCircle className="empty-icon" />
+                  <p>No hay reservas confirmadas</p>
+                  <p className="empty-note">Las reservas aceptadas aparecerán aquí</p>
+                </div>
+              ) : (
+                <div className="reservas-grid">
+                  {reservasConfirmadas.map((reserva) => {
+                    const fecha = formatearFecha(reserva.fecha);
+                    const horaInicio = formatearHora(reserva.hora_inicio);
+                    const horaFin = formatearHora(reserva.hora_fin);
+                    const canchaNombre = obtenerNombreCancha(reserva);
+                    const usuarioNombre = obtenerNombreUsuario(reserva);
+                    const estado = obtenerEstadoReserva(reserva);
+                    
+                    return (
+                      <div key={reserva.id_reserva} className="reserva-card">
+                        <div className="reserva-header">
+                          <h3>{canchaNombre}</h3>
+                          <span className={`estado-badge ${estado}`}>
+                            {estado}
+                          </span>
+                        </div>
+                        <div className="reserva-details">
+                          <div className="detail-item">
+                            <span className="detail-label">Usuario:</span>
+                            <span className="detail-value">{usuarioNombre}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">Fecha:</span>
+                            <span className="detail-value">{fecha}</span>
+                          </div>
+                          <div className="detail-item">
+                            <span className="detail-label">Hora:</span>
+                            <span className="detail-value">{horaInicio} - {horaFin}</span>
+                          </div>
+                          {reserva.codigo_acceso && (
+                            <div className="detail-item">
+                              <span className="detail-label">Código:</span>
+                              <span className="detail-value">{reserva.codigo_acceso}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           )}
 
           {/* Sección de Todas las Reservas */}
