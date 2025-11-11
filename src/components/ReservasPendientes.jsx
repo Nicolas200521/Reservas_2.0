@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaCheck, FaTimes, FaUser, FaCalendarAlt, FaClock, FaTimesCircle } from "react-icons/fa";
 import { obtenerReservas, actualizarEstadoReserva } from '../services/reservasService';
-import { formatearFecha, formatearHora, calcularDuracion, obtenerNombreCancha, obtenerNombreUsuario } from '../utils/reservaHelpers';
+import { formatearFecha, formatearHora, calcularDuracion, obtenerNombreCancha, obtenerNombreUsuario, obtenerEstadoReserva } from '../utils/reservaHelpers';
 import { useNotification } from '../hooks/useNotification';
 import Notification from './Notification';
 import './ReservasPendientes.css';
@@ -25,9 +25,9 @@ function ReservasPendientes({ onReservaActualizada }) {
     try {
       const data = await obtenerReservas();
       const reservas = Array.isArray(data) ? data : [];
-      // Filtrar solo las reservas pendientes usando estado_reserva_rel
+      // Filtrar solo las reservas pendientes usando la función helper para ser consistente
       const pendientes = reservas.filter(r => 
-        r.estado_reserva_rel?.estado_reserva === 'pendiente'
+        obtenerEstadoReserva(r) === 'pendiente'
       );
       setReservasPendientes(pendientes);
     } catch (error) {
@@ -52,10 +52,14 @@ function ReservasPendientes({ onReservaActualizada }) {
         throw new Error('ID de reserva inválido');
       }
 
-      // Actualizar el estado de la reserva a "confirmada" (id_estado_reserva: 2)
-      console.log('Aceptando reserva:', { reservaId: id, nuevoEstado: 2 });
+      // Actualizar el estado de la reserva a "confirmada" (id_estado_reserva: 1)
+      // ID 1 = confirmada, ID 2 = pendiente, ID 3 = cancelada, ID 4 = rechazada
+      console.log('Aceptando reserva:', { reservaId: id, nuevoEstado: 1 });
       
-      await actualizarEstadoReserva(id, 2);
+      await actualizarEstadoReserva(id, 1);
+      
+      // Remover la reserva del estado local inmediatamente para que desaparezca de la UI
+      setReservasPendientes(prev => prev.filter(r => r.id_reserva !== id));
       
       // Mostrar notificación de éxito
       showNotification('Reserva aceptada exitosamente. El estado ha cambiado a "confirmada".', 'success');
@@ -65,12 +69,17 @@ function ReservasPendientes({ onReservaActualizada }) {
         onReservaActualizada();
       }
       
-      // Recargar la lista de reservas pendientes (la reserva aceptada ya no aparecerá)
-      fetchReservasPendientes();
+      // Recargar la lista de reservas pendientes para asegurar sincronización con el backend
+      // Usar un pequeño delay para asegurar que el backend haya procesado el cambio
+      setTimeout(() => {
+        fetchReservasPendientes();
+      }, 500);
     } catch (error) {
       console.error('Error al aceptar reserva:', error);
       const mensajeError = error.message || 'Error al aceptar la reserva. Intenta nuevamente.';
       showNotification(mensajeError, 'error');
+      // Si hay error, recargar la lista para asegurar que el estado esté sincronizado
+      fetchReservasPendientes();
     } finally {
       setProcessingId(null);
     }
@@ -95,6 +104,9 @@ function ReservasPendientes({ onReservaActualizada }) {
       const motivo = motivoRechazo.trim() || 'Reserva rechazada por el administrador';
       await actualizarEstadoReserva(reservaId, 4, motivo);
       
+      // Remover la reserva del estado local inmediatamente para que desaparezca de la UI
+      setReservasPendientes(prev => prev.filter(r => r.id_reserva !== reservaId));
+      
       // Mostrar notificación de éxito
       showNotification('Reserva rechazada exitosamente.', 'success');
       
@@ -103,11 +115,16 @@ function ReservasPendientes({ onReservaActualizada }) {
         onReservaActualizada();
       }
       
-      // Recargar la lista de reservas pendientes (la reserva rechazada ya no aparecerá)
-      fetchReservasPendientes();
+      // Recargar la lista de reservas pendientes para asegurar sincronización con el backend
+      // Usar un pequeño delay para asegurar que el backend haya procesado el cambio
+      setTimeout(() => {
+        fetchReservasPendientes();
+      }, 500);
     } catch (error) {
       console.error('Error al rechazar reserva:', error);
       showNotification(error.message || 'Error al rechazar la reserva. Intenta nuevamente.', 'error');
+      // Si hay error, recargar la lista para asegurar que el estado esté sincronizado
+      fetchReservasPendientes();
     } finally {
       setProcessingId(null);
       setReservaARechazar(null);

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaSignOutAlt, FaCalendarAlt, FaUser, FaFutbol } from "react-icons/fa";
 import './Dashboard.css';
-import { obtenerReservas, actualizarEstadoReserva } from '../services/reservasService';
+import { obtenerReservas, cancelarReserva } from '../services/reservasService';
 import { getUser } from '../services/authService';
 import { obtenerEstadoReserva, formatearFecha, formatearHora, obtenerNombreCancha } from '../utils/reservaHelpers';
 import { useNotification } from '../hooks/useNotification';
@@ -66,18 +66,19 @@ function UserDashboard({ user, onLogout }) {
   };
 
   const handleConfirmarCancelar = async () => {
-    if (!reservaACancelar) return;
-
+    if (!reservaACancelar ) return;
     try {
-      // Actualizar el estado de la reserva a "cancelada" (id_estado_reserva: 3)
-      // Nota: El estado 3 (cancelada) no requiere el campo rechazo, solo el 4 (rechazada) lo requiere
-      await actualizarEstadoReserva(reservaACancelar, 3);
+      await cancelarReserva(reservaACancelar);
       showNotification('Reserva cancelada exitosamente', 'success');
       setShowConfirmCancelar(false);
       setReservaACancelar(null);
       fetchReservas(); // Recargar la lista
     } catch (error) {
-      showNotification(error.message || 'Error al cancelar la reserva', 'error');
+      let errorMessage = error.message || 'Error al cancelar la reserva';
+      if (errorMessage.includes('permisos') || errorMessage.includes('acceso denegado') || errorMessage.includes('Forbidden')) {
+        errorMessage = 'No tienes permisos para cancelar esta reserva. Solo puedes cancelar tus propias reservas.';
+      }
+      showNotification(errorMessage, 'error');
       setShowConfirmCancelar(false);
       setReservaACancelar(null);
     }
@@ -104,7 +105,7 @@ function UserDashboard({ user, onLogout }) {
         onClose={handleCancelarCancelar}
         onConfirm={handleConfirmarCancelar}
         title="Confirmar cancelación"
-        message="¿Estás seguro de que deseas cancelar esta reserva?"
+        message="Recuerda que al cancelar la reserva el 90% de la cuota no sera reembolsada. ¿Estás seguro de que deseas cancelar esta reserva?"
         confirmText="Cancelar reserva"
         cancelText="No cancelar"
         type="warning"
@@ -337,8 +338,7 @@ function UserDashboard({ user, onLogout }) {
                             </div>
                           )}
                         </div>
-                        {/* Solo mostrar el botón de cancelar si la reserva no está cancelada ni rechazada */}
-                        {(estado !== 'cancelada' && estado !== 'rechazada') && (
+                        {(estado !== 'rechazada' && estado !== 'cancelada') && (
                           <div className="reserva-actions">
                             <button 
                               className="action-button delete" 

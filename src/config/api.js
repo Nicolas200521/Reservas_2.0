@@ -45,6 +45,7 @@ export const API_ENDPOINTS = {
     MIS_RESERVAS: `${API_BASE_URL}/api/reservas/mis-reservas`,
     BY_ID: (id) => `${API_BASE_URL}/api/reservas/${id}`,
     ESTADO: (id) => `${API_BASE_URL}/api/reservas/${id}/estado`,
+    CANCELAR: (id) => `${API_BASE_URL}/api/reservas/${id}/cancelar`,
   },
   CANCHAS: {
     BASE: `${API_BASE_URL}/api/canchas`,

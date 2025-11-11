@@ -79,7 +79,7 @@ export const crearReserva = async (datos) => {
  *   - fecha: Formato YYYY-MM-DD
  *   - hora_inicio: Formato HH:MM
  *   - hora_fin: Formato HH:MM
- *   - id_estado_reserva: 1 (pendiente), 2 (confirmada), 3 (cancelada)
+ *   - id_estado_reserva: 1 (confirmada), 2 (pendiente), 3 (cancelada), 4 (rechazada)
  * @returns {Promise<Object>} Reserva actualizada
  */
 export const actualizarReserva = async (id, datos) => {
@@ -95,7 +95,7 @@ export const actualizarReserva = async (id, datos) => {
 /**
  * Actualiza el estado de una reserva usando el endpoint específico PATCH /api/reservas/:id/estado
  * @param {number} id - ID de la reserva
- * @param {number} idEstadoReserva - ID del estado (1: pendiente, 2: confirmada, 3: cancelada, 4: rechazada)
+ * @param {number} idEstadoReserva - ID del estado (1: confirmada, 2: pendiente, 3: cancelada, 4: rechazada)
  * @param {string} rechazo - Motivo de rechazo (requerido cuando idEstadoReserva es 4)
  * @returns {Promise<Object>} Reserva actualizada
  */
@@ -105,7 +105,7 @@ export const actualizarEstadoReserva = async (id, idEstadoReserva, rechazo = nul
       throw new Error('ID de reserva inválido');
     }
     if (!idEstadoReserva || ![1, 2, 3, 4].includes(idEstadoReserva)) {
-      throw new Error('ID de estado inválido. Debe ser 1 (pendiente), 2 (confirmada), 3 (cancelada) o 4 (rechazada)');
+      throw new Error('ID de estado inválido. Debe ser 1 (confirmada), 2 (pendiente), 3 (cancelada) o 4 (rechazada)');
     }
     
     // Construir el body del request
@@ -123,6 +123,26 @@ export const actualizarEstadoReserva = async (id, idEstadoReserva, rechazo = nul
     return reserva;
   } catch (error) {
     console.error(`Error al actualizar estado de reserva ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Cancela una reserva (solo para usuarios, no requiere admin)
+ * Usa el endpoint específico PATCH /api/reservas/:id/cancelar
+ * Solo el dueño de la reserva puede cancelarla
+ * @param {number} id - ID de la reserva a cancelar
+ * @returns {Promise<Object>} Reserva cancelada
+ */
+export const cancelarReserva = async (id) => {
+  try {
+    if (!id || isNaN(id)) {
+      throw new Error('ID de reserva inválido');
+    }
+    const reserva = await apiPatch(API_ENDPOINTS.RESERVAS.CANCELAR(id), {});
+    return reserva;
+  } catch (error) {
+    console.error(`Error al cancelar reserva ${id}:`, error);
     throw error;
   }
 };
