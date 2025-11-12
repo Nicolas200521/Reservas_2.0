@@ -26,9 +26,10 @@ function ReservasPendientes({ onReservaActualizada }) {
       const data = await obtenerReservas();
       const reservas = Array.isArray(data) ? data : [];
       // Filtrar solo las reservas pendientes usando la función helper para ser consistente
-      const pendientes = reservas.filter(r => 
-        obtenerEstadoReserva(r) === 'pendiente'
-      );
+      const pendientes = reservas.filter(r => {
+        const estado = obtenerEstadoReserva(r);
+        return estado && estado === 'pendiente';
+      });
       setReservasPendientes(pendientes);
     } catch (error) {
       console.error('Error al cargar reservas pendientes:', error);

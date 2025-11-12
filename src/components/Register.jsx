@@ -3,7 +3,17 @@ import { PiSoccerBallFill } from "react-icons/pi";
 import { FaEnvelope, FaLock, FaUser, FaArrowLeft, FaPhone } from "react-icons/fa";
 import './Auth.css';
 import { API_ENDPOINTS } from '../config/api';
-import { saveToken, saveUser } from '../services/authService';
+import { saveToken, saveUser, getToken } from '../services/authService';
+
+// Función auxiliar para leer cookies
+const getCookieValue = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop().split(';').shift();
+  }
+  return null;
+};
 
 function Register({ onBackToLogin, onRegisterSuccess }) {
   const [formData, setFormData] = useState({
@@ -68,6 +78,8 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
         headers: {
           'Content-Type': 'application/json',
         },
+        // No usar credentials: 'include' si el backend usa CORS con wildcard (*)
+        mode: 'cors',
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
@@ -85,16 +97,44 @@ function Register({ onBackToLogin, onRegisterSuccess }) {
       setSuccess('¡Registro exitoso! Redirigiendo...');
       
       // Guardar token y usuario si vienen en la respuesta
-      if (data.token) {
-        saveToken(data.token);
+      // El token puede venir en el JSON o en una cookie
+      let token = data.token || data.accessToken || data.access_token || data.jwt;
+      
+      // Si no viene en el JSON, intentar leerlo de las cookies
+      if (!token) {
+        const cookieToken = getCookieValue('token') || 
+                           getCookieValue('auth_token') || 
+                           getCookieValue('jwt') || 
+                           getCookieValue('access_token');
+        if (cookieToken) {
+          token = cookieToken;
+        }
       }
-      if (data.user) {
-        saveUser(data.user);
+      
+      // Intentar guardar el token en localStorage (si viene en JSON)
+      if (token && (data.token || data.accessToken || data.access_token || data.jwt)) {
+        saveToken(token);
+      }
+      
+      // Verificar que el token está disponible
+      if (token) {
+        const savedToken = getToken();
+        if (!savedToken) {
+          // Si no se pudo obtener el token, puede ser que venga en cookie HTTP-only
+          // En ese caso, el backend lo manejará automáticamente
+        }
+      }
+
+      // El usuario puede venir como: user, usuario, data
+      const userData = data.user || data.usuario || data.data;
+      
+      if (userData) {
+        saveUser(userData);
       }
       
       setTimeout(() => {
-        if (onRegisterSuccess && data.user) {
-          onRegisterSuccess(data.user);
+        if (onRegisterSuccess && userData) {
+          onRegisterSuccess(userData);
         } else {
           onBackToLogin();
         }

@@ -45,6 +45,9 @@ export const apiRequest = async (url, options = {}) => {
   const config = {
     ...options,
     headers: finalHeaders,
+    // Solo usar credentials: 'include' si el backend está configurado con CORS específico
+    // Si el backend usa wildcard (*), no usar credentials para evitar errores de CORS
+    // credentials: 'include', // Descomentar solo si el backend tiene CORS con origen específico
   };
 
   try {

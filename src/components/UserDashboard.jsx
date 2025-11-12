@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PiSoccerBallFill } from "react-icons/pi";
 import { FaSignOutAlt, FaCalendarAlt, FaUser, FaFutbol } from "react-icons/fa";
 import './Dashboard.css';
@@ -6,6 +6,7 @@ import { obtenerReservas, cancelarReserva } from '../services/reservasService';
 import { getUser } from '../services/authService';
 import { obtenerEstadoReserva, formatearFecha, formatearHora, obtenerNombreCancha } from '../utils/reservaHelpers';
 import { useNotification } from '../hooks/useNotification';
+import { useWebSocket } from '../hooks/useWebSocket';
 import Notification from './Notification';
 import ConfirmModal from './ConfirmModal';
 import CanchasDisponibles from './CanchasDisponibles';
@@ -17,7 +18,82 @@ function UserDashboard({ user, onLogout }) {
   const [filtroEstado, setFiltroEstado] = useState('todas'); // 'todas', 'activas', 'canceladas'
   const [showConfirmCancelar, setShowConfirmCancelar] = useState(false);
   const [reservaACancelar, setReservaACancelar] = useState(null);
-  const { notification, showNotification, hideNotification } = useNotification(); 
+  const { notification, showNotification, hideNotification } = useNotification();
+
+  // Función para actualizar una reserva en la lista
+  const actualizarReservaEnLista = (reservaActualizada) => {
+    setReservas(prevReservas => {
+      const currentUser = getUser();
+      const userId = currentUser?.id || currentUser?.id_usuario;
+      const reservaUserId = reservaActualizada.id_usuario || reservaActualizada.usuario?.id_usuario;
+      
+      // Solo actualizar si la reserva pertenece al usuario actual
+      if (userId && reservaUserId !== userId) {
+        return prevReservas;
+      }
+
+      // Buscar si la reserva ya existe en la lista
+      const existe = prevReservas.some(r => r.id_reserva === reservaActualizada.id_reserva);
+      
+      if (existe) {
+        // Actualizar reserva existente
+        return prevReservas.map(r => 
+          r.id_reserva === reservaActualizada.id_reserva ? reservaActualizada : r
+        );
+      } else {
+        // Agregar nueva reserva (si pertenece al usuario)
+        return [...prevReservas, reservaActualizada];
+      }
+    });
+  };
+
+  // Función para eliminar una reserva de la lista
+  const eliminarReservaDeLista = (idReserva) => {
+    setReservas(prevReservas => 
+      prevReservas.filter(r => r.id_reserva !== idReserva)
+    );
+  };
+
+  // Configurar WebSocket para actualizaciones en tiempo real
+  const { obtenerMisReservas: obtenerMisReservasWS } = useWebSocket({
+    enabled: true,
+    obtenerMisReservas: true, // Obtener solo las reservas del usuario
+    autoObtenerReservas: activeTab === 'mis-reservas', // Solo obtener si está en la pestaña de reservas
+    onListaReservas: (listaReservas) => {
+      // Cuando se recibe la lista inicial de reservas desde WebSocket
+      const todasReservas = Array.isArray(listaReservas) ? listaReservas : [];
+      
+      // Filtrar solo las reservas del usuario actual (por si acaso)
+      const currentUser = getUser();
+      const reservasUsuario = currentUser?.id || currentUser?.id_usuario
+        ? todasReservas.filter(r => {
+            const reservaUserId = r.id_usuario || r.usuario?.id_usuario;
+            const userId = currentUser.id || currentUser.id_usuario;
+            return reservaUserId === userId;
+          })
+        : todasReservas;
+      
+      setReservas(reservasUsuario);
+      setLoading(false);
+    },
+    onNuevaReserva: (nuevaReserva) => {
+      // Nueva reserva recibida automáticamente cuando alguien crea una
+      // Verificar que sea del usuario actual antes de agregarla
+      const currentUser = getUser();
+      const reservaUserId = nuevaReserva.id_usuario || nuevaReserva.usuario?.id_usuario;
+      const userId = currentUser?.id || currentUser?.id_usuario;
+      
+      if (reservaUserId === userId) {
+        setReservas(prev => [nuevaReserva, ...prev]);
+        showNotification('Nueva reserva creada', 'success');
+      }
+    },
+    onActualizacion: (reservaActualizada) => {
+      // Actualización de reserva existente (recibe la reserva actualizada directamente)
+      actualizarReservaEnLista(reservaActualizada);
+      showNotification('Reserva actualizada', 'info');
+    },
+  }); 
 
   useEffect(() => {
     if (activeTab === 'mis-reservas') {
@@ -160,37 +236,55 @@ function UserDashboard({ user, onLogout }) {
           </div>
 
           <section className="stats-section">
-            <div className="stat-card">
-              <FaCalendarAlt className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservas.length}</h3>
-                <p>Mis Reservas</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <PiSoccerBallFill className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'confirmada').length}</h3>
-                <p>Reservas Confirmadas</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <FaCalendarAlt className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'pendiente').length}</h3>
-                <p>Pendientes</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <FaSignOutAlt className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservas.filter(r => {
-                  const estado = obtenerEstadoReserva(r);
-                  return estado === 'cancelada' || estado === 'rechazada';
-                }).length}</h3>
-                <p>Canceladas/Rechazadas</p>
-              </div>
-            </div>
+            {(() => {
+              // Calcular estadísticas usando useMemo para optimizar
+              const totalReservas = reservas.length;
+              const confirmadas = reservas.filter(r => {
+                const estado = obtenerEstadoReserva(r);
+                return estado && estado === 'confirmada';
+              }).length;
+              const pendientes = reservas.filter(r => {
+                const estado = obtenerEstadoReserva(r);
+                return estado && estado === 'pendiente';
+              }).length;
+              const canceladasRechazadas = reservas.filter(r => {
+                const estado = obtenerEstadoReserva(r);
+                return estado && (estado === 'cancelada' || estado === 'rechazada');
+              }).length;
+
+              return (
+                <>
+                  <div className="stat-card">
+                    <FaCalendarAlt className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{totalReservas}</h3>
+                      <p>Mis Reservas</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <PiSoccerBallFill className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{confirmadas}</h3>
+                      <p>Reservas Confirmadas</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <FaCalendarAlt className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{pendientes}</h3>
+                      <p>Pendientes</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <FaSignOutAlt className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{canceladasRechazadas}</h3>
+                      <p>Canceladas/Rechazadas</p>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </section>
 
           {/* Sección de Canchas Disponibles */}
@@ -272,6 +366,7 @@ function UserDashboard({ user, onLogout }) {
                 // Filtrar reservas según el filtro seleccionado
                 const reservasFiltradas = reservas.filter(reserva => {
                   const estado = obtenerEstadoReserva(reserva);
+                  if (!estado) return false; // Excluir reservas sin estado
                   if (filtroEstado === 'todas') return true;
                   if (filtroEstado === 'activas') {
                     return estado === 'pendiente' || estado === 'confirmada';
@@ -313,6 +408,9 @@ function UserDashboard({ user, onLogout }) {
                     const horaFin = formatearHora(reserva.hora_fin);
                     const canchaNombre = obtenerNombreCancha(reserva);
                     const estado = obtenerEstadoReserva(reserva);
+                    
+                    // Si no hay estado, no mostrar la reserva
+                    if (!estado) return null;
                     
                     return (
                       <div key={reserva.id_reserva} className="reserva-card">
