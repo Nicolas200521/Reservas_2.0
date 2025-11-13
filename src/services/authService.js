@@ -3,21 +3,75 @@
 
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'user_data';
+const TOKEN_COOKIE_NAME = 'token'; // Nombre de la cookie donde viene el token
+
+/**
+ * Obtiene el valor de una cookie por su nombre
+ */
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop().split(';').shift();
+  }
+  return null;
+};
 
 /**
  * Guarda el token JWT en localStorage
  */
 export const saveToken = (token) => {
-  if (token) {
+  if (!token) {
+    return false;
+  }
+  
+  // Validar que el token sea un string
+  if (typeof token !== 'string') {
+    return false;
+  }
+  
+  // Validar formato básico de JWT (debe tener al menos un punto)
+  if (!token.includes('.')) {
+    return false;
+  }
+  
+  try {
     localStorage.setItem(TOKEN_KEY, token);
+    return true;
+  } catch (error) {
+    return false;
   }
 };
 
 /**
- * Obtiene el token JWT del localStorage
+ * Obtiene el token JWT
+ * Primero intenta obtenerlo del localStorage, luego de las cookies
  */
 export const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY);
+  // Primero intentar obtener del localStorage
+  const localToken = localStorage.getItem(TOKEN_KEY);
+  if (localToken) {
+    return localToken;
+  }
+  
+  // Si no está en localStorage, intentar obtener de las cookies
+  // Puede venir como: token, auth_token, jwt, access_token
+  const cookieToken = getCookie('token') || 
+                      getCookie('auth_token') || 
+                      getCookie('jwt') || 
+                      getCookie('access_token');
+  
+  if (cookieToken) {
+    // Guardar en localStorage para futuras consultas
+    try {
+      localStorage.setItem(TOKEN_KEY, cookieToken);
+    } catch (error) {
+      // Si no se puede guardar en localStorage, solo retornar la cookie
+    }
+    return cookieToken;
+  }
+  
+  return null;
 };
 
 /**
@@ -54,6 +108,8 @@ export const isAuthenticated = () => {
 
 /**
  * Obtiene los headers con el token para las peticiones autenticadas
+ * Si el token viene en una cookie HTTP-only, no se puede leer aquí,
+ * pero el navegador lo enviará automáticamente con credentials: 'include'
  */
 export const getAuthHeaders = () => {
   const token = getToken();
@@ -61,9 +117,13 @@ export const getAuthHeaders = () => {
     'Content-Type': 'application/json',
   };
   
+  // Si tenemos el token disponible (de localStorage o cookie no HTTP-only),
+  // enviarlo en el header Authorization
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+  // Si no hay token pero el backend usa cookies HTTP-only,
+  // el token se enviará automáticamente con credentials: 'include'
   
   return headers;
 };

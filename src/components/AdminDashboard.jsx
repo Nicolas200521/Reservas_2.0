@@ -6,6 +6,7 @@ import { obtenerReservas } from '../services/reservasService';
 import { obtenerUsuarios, eliminarUsuario } from '../services/usuariosService';
 import { obtenerEstadoReserva, formatearFecha, formatearHora, obtenerNombreCancha, obtenerNombreUsuario } from '../utils/reservaHelpers';
 import { useNotification } from '../hooks/useNotification';
+import { useWebSocket } from '../hooks/useWebSocket';
 import Notification from './Notification';
 import ConfirmModal from './ConfirmModal';
 import ReservasPendientes from './ReservasPendientes';
@@ -25,17 +26,134 @@ function AdminDashboard({ user, onLogout }) {
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null);
   const { notification, showNotification, hideNotification } = useNotification();
 
+  // Función para actualizar una reserva en la lista
+  const actualizarReservaEnLista = (reservaActualizada) => {
+    // Actualizar lista principal
+    setReservas(prevReservas => {
+      const existe = prevReservas.some(r => r.id_reserva === reservaActualizada.id_reserva);
+      if (existe) {
+        return prevReservas.map(r => 
+          r.id_reserva === reservaActualizada.id_reserva ? reservaActualizada : r
+        );
+      } else {
+        return [...prevReservas, reservaActualizada];
+      }
+    });
+    
+    // Actualizar listas filtradas según el estado
+    const estado = obtenerEstadoReserva(reservaActualizada);
+    actualizarReservaConfirmada(reservaActualizada);
+    actualizarReservaCancelada(reservaActualizada);
+  };
+
+  // Función para actualizar reservas confirmadas
+  const actualizarReservaConfirmada = (reservaActualizada) => {
+    const estado = obtenerEstadoReserva(reservaActualizada);
+    if (estado === 'confirmada') {
+      setReservasConfirmadas(prev => {
+        const existe = prev.some(r => r.id_reserva === reservaActualizada.id_reserva);
+        if (existe) {
+          return prev.map(r => 
+            r.id_reserva === reservaActualizada.id_reserva ? reservaActualizada : r
+          );
+        } else {
+          return [...prev, reservaActualizada];
+        }
+      });
+    } else {
+      // Si ya no está confirmada, removerla de la lista
+      setReservasConfirmadas(prev => 
+        prev.filter(r => r.id_reserva !== reservaActualizada.id_reserva)
+      );
+    }
+  };
+
+  // Función para actualizar reservas canceladas
+  const actualizarReservaCancelada = (reservaActualizada) => {
+    const estado = obtenerEstadoReserva(reservaActualizada);
+    if (estado === 'cancelada' || estado === 'rechazada') {
+      setReservasCanceladas(prev => {
+        const existe = prev.some(r => r.id_reserva === reservaActualizada.id_reserva);
+        if (existe) {
+          return prev.map(r => 
+            r.id_reserva === reservaActualizada.id_reserva ? reservaActualizada : r
+          );
+        } else {
+          return [...prev, reservaActualizada];
+        }
+      });
+    } else {
+      // Si ya no está cancelada, removerla de la lista
+      setReservasCanceladas(prev => 
+        prev.filter(r => r.id_reserva !== reservaActualizada.id_reserva)
+      );
+    }
+  };
+
+  // Función para eliminar una reserva de todas las listas
+  const eliminarReservaDeListas = (idReserva) => {
+    setReservas(prev => prev.filter(r => r.id_reserva !== idReserva));
+    setReservasConfirmadas(prev => prev.filter(r => r.id_reserva !== idReserva));
+    setReservasCanceladas(prev => prev.filter(r => r.id_reserva !== idReserva));
+  };
+
+  // Configurar WebSocket para actualizaciones en tiempo real
+  const { obtenerReservas: obtenerReservasWS } = useWebSocket({
+    enabled: true,
+    obtenerMisReservas: false, // Admin obtiene todas las reservas
+    autoObtenerReservas: true,
+    onListaReservas: (listaReservas) => {
+      // Cuando se recibe la lista inicial de reservas desde WebSocket
+      const todasReservas = Array.isArray(listaReservas) ? listaReservas : [];
+      
+      // Actualizar todas las listas según el estado
+      setReservas(todasReservas);
+      
+      const confirmadas = todasReservas.filter(r => {
+        const estado = obtenerEstadoReserva(r);
+        return estado && estado === 'confirmada';
+      });
+      setReservasConfirmadas(confirmadas);
+      
+      const canceladas = todasReservas.filter(r => {
+        const estado = obtenerEstadoReserva(r);
+        return estado && (estado === 'cancelada' || estado === 'rechazada');
+      });
+      setReservasCanceladas(canceladas);
+      
+      setLoading(false);
+      setLoadingConfirmadas(false);
+      setLoadingCanceladas(false);
+    },
+    onNuevaReserva: (nuevaReserva) => {
+      // Nueva reserva recibida automáticamente cuando alguien crea una
+      setReservas(prev => [nuevaReserva, ...prev]);
+      
+      // Actualizar listas filtradas según el estado
+      const estado = obtenerEstadoReserva(nuevaReserva);
+      if (estado === 'confirmada') {
+        setReservasConfirmadas(prev => [nuevaReserva, ...prev]);
+      } else if (estado === 'cancelada' || estado === 'rechazada') {
+        setReservasCanceladas(prev => [nuevaReserva, ...prev]);
+      }
+      
+      showNotification('Nueva reserva recibida', 'info');
+    },
+    onActualizacion: (reservaActualizada) => {
+      // Actualización de reserva existente (recibe la reserva actualizada directamente)
+      actualizarReservaEnLista(reservaActualizada);
+      showNotification('Reserva actualizada', 'info');
+    },
+  });
+
   useEffect(() => {
-    // Cargar reservas canceladas al inicio para las estadísticas
+    // Cargar todas las reservas al inicio para actualizar las estadísticas
+    // Esto asegura que los contadores se actualicen correctamente
+    fetchReservas();
+    fetchReservasConfirmadas();
     fetchReservasCanceladas();
     
-    if (activeTab === 'reservas') {
-      fetchReservas();
-    } else if (activeTab === 'confirmadas') {
-      fetchReservasConfirmadas();
-    } else if (activeTab === 'canceladas') {
-      fetchReservasCanceladas();
-    } else if (activeTab === 'usuarios') {
+    if (activeTab === 'usuarios') {
       fetchUsuarios();
     }
   }, [activeTab]);
@@ -44,7 +162,21 @@ function AdminDashboard({ user, onLogout }) {
     setLoading(true);
     try {
       const data = await obtenerReservas();
-      setReservas(Array.isArray(data) ? data : []);
+      const todasReservas = Array.isArray(data) ? data : [];
+      setReservas(todasReservas);
+      
+      // También actualizar las listas filtradas para mantener sincronización
+      const confirmadas = todasReservas.filter(r => {
+        const estado = obtenerEstadoReserva(r);
+        return estado && estado === 'confirmada';
+      });
+      setReservasConfirmadas(confirmadas);
+      
+      const canceladas = todasReservas.filter(r => {
+        const estado = obtenerEstadoReserva(r);
+        return estado && (estado === 'cancelada' || estado === 'rechazada');
+      });
+      setReservasCanceladas(canceladas);
     } catch (error) {
       console.error('Error al cargar reservas:', error);
       setReservas([]);
@@ -59,9 +191,10 @@ function AdminDashboard({ user, onLogout }) {
       const data = await obtenerReservas();
       const todasReservas = Array.isArray(data) ? data : [];
       // Filtrar solo las reservas confirmadas
-      const confirmadas = todasReservas.filter(r => 
-        obtenerEstadoReserva(r) === 'confirmada'
-      );
+      const confirmadas = todasReservas.filter(r => {
+        const estado = obtenerEstadoReserva(r);
+        return estado && estado === 'confirmada';
+      });
       setReservasConfirmadas(confirmadas);
     } catch (error) {
       console.error('Error al cargar reservas confirmadas:', error);
@@ -79,7 +212,7 @@ function AdminDashboard({ user, onLogout }) {
       // Filtrar reservas canceladas y rechazadas
       const canceladas = todasReservas.filter(r => {
         const estado = obtenerEstadoReserva(r);
-        return estado === 'cancelada' || estado === 'rechazada';
+        return estado && (estado === 'cancelada' || estado === 'rechazada');
       });
       setReservasCanceladas(canceladas);
     } catch (error) {
@@ -254,34 +387,50 @@ function AdminDashboard({ user, onLogout }) {
           </div>
 
           <section className="stats-section">
-            <div className="stat-card">
-              <FaCalendarAlt className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'pendiente').length}</h3>
-                <p>Reservas Pendientes</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <PiSoccerBallFill className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservas.filter(r => obtenerEstadoReserva(r) === 'confirmada').length}</h3>
-                <p>Reservas Confirmadas</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <FaTimes className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservasCanceladas.length}</h3>
-                <p>Canceladas/Rechazadas</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <FaUsers className="stat-icon" />
-              <div className="stat-info">
-                <h3>{reservas.length}</h3>
-                <p>Total Reservas</p>
-              </div>
-            </div>
+            {(() => {
+              // Calcular estadísticas usando los estados actualizados
+              // Usar reservasConfirmadas y reservasCanceladas que se mantienen actualizados
+              const pendientes = reservas.filter(r => {
+                const estado = obtenerEstadoReserva(r);
+                return estado && estado === 'pendiente';
+              }).length;
+              const confirmadas = reservasConfirmadas.length; // Usar el estado que se mantiene actualizado
+              const canceladasRechazadas = reservasCanceladas.length; // Usar el estado que se mantiene actualizado
+              const totalReservas = reservas.length;
+
+              return (
+                <>
+                  <div className="stat-card">
+                    <FaCalendarAlt className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{pendientes}</h3>
+                      <p>Reservas Pendientes</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <PiSoccerBallFill className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{confirmadas}</h3>
+                      <p>Reservas Confirmadas</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <FaTimes className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{canceladasRechazadas}</h3>
+                      <p>Canceladas/Rechazadas</p>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <FaUsers className="stat-icon" />
+                    <div className="stat-info">
+                      <h3>{totalReservas}</h3>
+                      <p>Total Reservas</p>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </section>
 
           {/* Sección de Reservas Pendientes */}
@@ -325,6 +474,9 @@ function AdminDashboard({ user, onLogout }) {
                     const canchaNombre = obtenerNombreCancha(reserva);
                     const usuarioNombre = obtenerNombreUsuario(reserva);
                     const estado = obtenerEstadoReserva(reserva);
+                    
+                    // Si no hay estado, no mostrar la reserva
+                    if (!estado) return null;
                     
                     return (
                       <div key={reserva.id_reserva} className="reserva-card">
@@ -385,6 +537,9 @@ function AdminDashboard({ user, onLogout }) {
                     const canchaNombre = obtenerNombreCancha(reserva);
                     const usuarioNombre = obtenerNombreUsuario(reserva);
                     const estado = obtenerEstadoReserva(reserva);
+                    
+                    // Si no hay estado, no mostrar la reserva
+                    if (!estado) return null;
                     
                     return (
                       <div key={reserva.id_reserva} className="reserva-card">
@@ -447,6 +602,9 @@ function AdminDashboard({ user, onLogout }) {
                     const canchaNombre = obtenerNombreCancha(reserva);
                     const usuarioNombre = obtenerNombreUsuario(reserva);
                     const estado = obtenerEstadoReserva(reserva);
+                    
+                    // Si no hay estado, no mostrar la reserva
+                    if (!estado) return null;
                     
                     return (
                       <div key={reserva.id_reserva} className="reserva-card">

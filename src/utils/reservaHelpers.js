@@ -7,12 +7,21 @@
  */
 export const obtenerEstadoReserva = (reserva) => {
   // Usar estado_reserva_rel como fuente de verdad (viene de la DB)
+  // Esta relación contiene el estado real desde la base de datos
   if (reserva.estado_reserva_rel?.estado_reserva) {
-    return reserva.estado_reserva_rel.estado_reserva;
+    // Normalizar el estado a minúsculas para comparaciones consistentes
+    const estado = reserva.estado_reserva_rel.estado_reserva.toLowerCase().trim();
+    return estado;
   }
   
-  // Fallback: si no hay relación, usar pendiente por defecto
-  return 'pendiente';
+  // Si no hay estado_reserva_rel, intentar usar el estado directamente si existe
+  if (reserva.estado_reserva) {
+    return reserva.estado_reserva.toLowerCase().trim();
+  }
+  
+  // Si no hay información de estado desde la DB, retornar null
+  // El componente que use esta función debe manejar este caso
+  return null;
 };
 
 /**
