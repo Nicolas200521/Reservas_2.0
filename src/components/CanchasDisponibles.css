@@ -150,6 +150,16 @@
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
@@ -281,6 +291,76 @@
   font-size: 1.1rem;
 }
 
+/* Método de pago en formulario de reserva */
+.metodo-pago-reserva {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid #e9ecef;
+}
+
+.metodos-pago-reserva {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.metodo-pago-btn-reserva {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.875rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  background: #f8f9fa;
+  color: #343a40;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.metodo-pago-btn-reserva:hover:not(:disabled) {
+  border-color: #28a745;
+  background: #f0f8f4;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.15);
+}
+
+.metodo-pago-btn-reserva.active {
+  border-color: #28a745;
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  color: #155724;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+}
+
+.metodo-pago-btn-reserva:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.metodo-pago-btn-reserva svg {
+  font-size: 1.3rem;
+}
+
+.metodo-pago-note {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #6c757d;
+  font-style: italic;
+  text-align: center;
+}
+
+.loading-metodos {
+  padding: 1rem;
+  text-align: center;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
 .modal-actions {
   display: flex;
   gap: 1rem;
@@ -334,6 +414,248 @@
   font-size: 0.9rem;
 }
 
+/* Estilos para el modal de pago */
+.pago-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.pago-resumen {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 2px solid #dee2e6;
+}
+
+.resumen-title {
+  color: #1e7e34;
+  font-size: 1.2rem;
+  margin: 0 0 1rem 0;
+  font-weight: 700;
+}
+
+.pago-info {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 2px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.info-item:not(:last-child) {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.info-label {
+  color: #6c757d;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.info-value {
+  color: #343a40;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.info-value.monto {
+  color: #28a745;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.pago-simulado {
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.pago-header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.pago-logo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pago-icon {
+  font-size: 3rem;
+  color: #28a745;
+}
+
+.pago-logo h3 {
+  color: #1e7e34;
+  margin: 0 0 0.25rem 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.pago-subtitle {
+  color: #6c757d;
+  font-size: 0.9rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lock-icon {
+  color: #28a745;
+  font-size: 0.9rem;
+}
+
+/* Selector de método de pago */
+.metodo-pago-selector {
+  margin-bottom: 1.5rem;
+}
+
+.selector-label {
+  display: block;
+  font-weight: 600;
+  color: #343a40;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.metodos-pago {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.metodo-pago-btn {
+  flex: 1;
+  min-width: 200px;
+  padding: 1rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  background: #f8f9fa;
+  color: #343a40;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.metodo-pago-btn:hover:not(:disabled) {
+  border-color: #28a745;
+  background: #f0f8f4;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.15);
+}
+
+.metodo-pago-btn.active {
+  border-color: #28a745;
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  color: #155724;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+}
+
+.metodo-pago-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.metodo-pago-btn svg {
+  font-size: 1.5rem;
+}
+
+.pago-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pago-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pago-form label {
+  font-weight: 600;
+  color: #343a40;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.label-icon-small {
+  font-size: 0.9rem;
+  color: #28a745;
+}
+
+.pago-form input {
+  padding: 0.75rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: #f8f9fa;
+}
+
+.pago-form input:focus {
+  outline: none;
+  border-color: #28a745;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+}
+
+.pago-form input:disabled {
+  background: #e9ecef;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Información de seguridad */
+.pago-seguridad {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #e7f3ff;
+  border-radius: 8px;
+  border: 1px solid #b3d9ff;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #004085;
+  font-size: 0.9rem;
+}
+
+.seguridad-icon {
+  font-size: 1.2rem;
+  color: #0066cc;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .canchas-grid {
@@ -343,6 +665,10 @@
   .modal-content {
     max-width: 100%;
     margin: 1rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
   }
 }
 

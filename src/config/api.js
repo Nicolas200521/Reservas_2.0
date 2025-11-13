@@ -63,6 +63,11 @@ export const API_ENDPOINTS = {
     BASE: `${API_BASE_URL}/api/canchas`,
     BY_ID: (id) => `${API_BASE_URL}/api/canchas/${id}`,
   },
+  PAGOS: {
+    BASE: `${API_BASE_URL}/api/pagos`,
+    BY_ID: (id) => `${API_BASE_URL}/api/pagos/${id}`,
+    METODOS: `${API_BASE_URL}/api/pagos/metodos`,
+  },
   HEALTH: `${API_BASE_URL}/api/health`,
 };
 
