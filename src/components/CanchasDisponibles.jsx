@@ -126,10 +126,6 @@ function CanchasDisponibles({ user, onReservaCreada }) {
       const reservaData = response.reserva || response;
       const idReserva = reservaData.id_reserva || reservaData.id || reservaData.id_reserva;
 
-      // Debug: verificar que tenemos el ID de la reserva
-      console.log('📋 Reserva creada:', reservaData);
-      console.log('🆔 ID de reserva:', idReserva);
-      console.log('💰 Monto calculado:', monto);
 
       // Validar que tenemos el ID de la reserva antes de continuar
       if (!idReserva) {
@@ -160,7 +156,6 @@ function CanchasDisponibles({ user, onReservaCreada }) {
           id_estado_pago: 1  // Estado pendiente
         });
         
-        console.log('✅ Pago creado automáticamente para la reserva:', idReserva);
       } catch (errorPago) {
         console.error('⚠️ Error al crear el pago automáticamente:', errorPago);
         // No bloqueamos el flujo si falla la creación del pago
